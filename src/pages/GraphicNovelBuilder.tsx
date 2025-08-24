@@ -500,14 +500,51 @@ const GraphicNovelBuilder = () => {
   const [aiPrompt, setAiPrompt] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [referenceImageUrl, setReferenceImageUrl] = useState("");
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const [manualImageUrl, setManualImageUrl] = useState("");
   const [aspectRatio, setAspectRatio] = useState<string>("1:1");
   const [outputFormat, setOutputFormat] = useState<string>("png");
   const [safetyTolerance, setSafetyTolerance] = useState<number>(2);
   const [promptUpsampling, setPromptUpsampling] = useState<boolean>(true);
   const [seed, setSeed] = useState<number | null>(null);
+  const [guidanceScale, setGuidanceScale] = useState<number>(7.5);
+  const [inferenceSteps, setInferenceSteps] = useState<number>(4);
+  const [imageStrength, setImageStrength] = useState<number>(0.8);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Helper function to create composite image from multiple references
+  const createCompositeImage = async (images: string[]): Promise<string> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      
+      const gridSize = Math.ceil(Math.sqrt(images.length));
+      canvas.width = 512 * gridSize;
+      canvas.height = 512 * gridSize;
+      
+      let loadedCount = 0;
+      
+      images.forEach((imageSrc, index) => {
+        const img = document.createElement('img');
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const row = Math.floor(index / gridSize);
+          const col = index % gridSize;
+          const x = col * 512;
+          const y = row * 512;
+          
+          ctx.drawImage(img, x, y, 512, 512);
+          loadedCount++;
+          
+          if (loadedCount === images.length) {
+            resolve(canvas.toDataURL('image/png'));
+          }
+        };
+        img.src = imageSrc;
+      });
+    });
+  };
 
   // History management
   const saveToHistory = useCallback((newPages: SplitNode[]) => {
@@ -642,13 +679,24 @@ const GraphicNovelBuilder = () => {
     const character = characterId ? characters.find(c => c.id === characterId) : undefined;
     const jobId = crypto.randomUUID();
     
+    // Prepare reference image input
+    let inputImage = null;
+    if (referenceImages.length > 0) {
+      inputImage = referenceImages.length === 1 
+        ? referenceImages[0] 
+        : await createCompositeImage(referenceImages);
+    } else if (referenceImageUrl.trim()) {
+      inputImage = referenceImageUrl.trim();
+    }
+    
     // Create generation job
     const generationJob: GenerationJob = {
       id: jobId,
       characterId,
       prompt: aiPrompt,
       seed: seed || undefined,
-      useReference: false,
+      useReference: !!inputImage,
+      referenceImageUrl: inputImage || undefined,
       aspectRatio: aspectRatio as any,
       outputFormat: outputFormat as any,
       promptUpsampling,
@@ -665,7 +713,8 @@ const GraphicNovelBuilder = () => {
       prompt: aiPrompt,
       seed: seed || undefined,
       imageUrl: '',
-      useReference: false,
+      useReference: !!inputImage,
+      referenceImageUrl: inputImage || undefined,
       aspectRatio: aspectRatio as any,
       outputFormat: outputFormat as any,
       promptUpsampling,
@@ -681,15 +730,27 @@ const GraphicNovelBuilder = () => {
     try {
       toast.info("Generating AI image...");
       
+      // Build request body with all parameters
+      const requestBody: any = {
+        prompt: aiPrompt,
+        aspect_ratio: aspectRatio,
+        output_format: outputFormat,
+        safety_tolerance: safetyTolerance,
+        prompt_upsampling: promptUpsampling,
+        seed: seed || undefined
+      };
+
+      // Add optional parameters
+      if (inputImage) {
+        requestBody.input_image = inputImage;
+      }
+      
+      if (negativePrompt.trim()) {
+        requestBody.negative_prompt = negativePrompt.trim();
+      }
+      
       const { data, error } = await supabase.functions.invoke('generate-image-novel', {
-        body: {
-          prompt: aiPrompt,
-          aspect_ratio: aspectRatio,
-          output_format: outputFormat,
-          safety_tolerance: safetyTolerance,
-          prompt_upsampling: promptUpsampling,
-          seed: seed || undefined
-        }
+        body: requestBody
       });
 
       if (error) {
@@ -1095,10 +1156,24 @@ const GraphicNovelBuilder = () => {
                 setNegativePrompt={setNegativePrompt}
                 referenceImageUrl={referenceImageUrl}
                 setReferenceImageUrl={setReferenceImageUrl}
+                referenceImages={referenceImages}
+                setReferenceImages={setReferenceImages}
                 aspectRatio={aspectRatio}
                 setAspectRatio={setAspectRatio}
                 seed={seed}
                 setSeed={setSeed}
+                guidanceScale={guidanceScale}
+                setGuidanceScale={setGuidanceScale}
+                inferenceSteps={inferenceSteps}
+                setInferenceSteps={setInferenceSteps}
+                imageStrength={imageStrength}
+                setImageStrength={setImageStrength}
+                outputFormat={outputFormat}
+                setOutputFormat={setOutputFormat}
+                safetyTolerance={safetyTolerance}
+                setSafetyTolerance={setSafetyTolerance}
+                promptUpsampling={promptUpsampling}
+                setPromptUpsampling={setPromptUpsampling}
               />
             )}
             
@@ -1261,10 +1336,24 @@ interface EnhancedLeafInspectorProps {
   setNegativePrompt: (prompt: string) => void;
   referenceImageUrl: string;
   setReferenceImageUrl: (url: string) => void;
+  referenceImages: string[];
+  setReferenceImages: (images: string[]) => void;
   aspectRatio: string;
   setAspectRatio: (ratio: string) => void;
   seed: number | null;
   setSeed: (seed: number | null) => void;
+  guidanceScale: number;
+  setGuidanceScale: (scale: number) => void;
+  inferenceSteps: number;
+  setInferenceSteps: (steps: number) => void;
+  imageStrength: number;
+  setImageStrength: (strength: number) => void;
+  outputFormat: string;
+  setOutputFormat: (format: string) => void;
+  safetyTolerance: number;
+  setSafetyTolerance: (tolerance: number) => void;
+  promptUpsampling: boolean;
+  setPromptUpsampling: (upsampling: boolean) => void;
 }
 
 const EnhancedLeafInspector: React.FC<EnhancedLeafInspectorProps> = ({
@@ -1282,11 +1371,45 @@ const EnhancedLeafInspector: React.FC<EnhancedLeafInspectorProps> = ({
   setNegativePrompt,
   referenceImageUrl,
   setReferenceImageUrl,
+  referenceImages,
+  setReferenceImages,
   aspectRatio,
   setAspectRatio,
   seed,
-  setSeed
+  setSeed,
+  guidanceScale,
+  setGuidanceScale,
+  inferenceSteps,
+  setInferenceSteps,
+  imageStrength,
+  setImageStrength,
+  outputFormat,
+  setOutputFormat,
+  safetyTolerance,
+  setSafetyTolerance,
+  promptUpsampling,
+  setPromptUpsampling
 }) => {
+  const [referenceMode, setReferenceMode] = useState<"upload" | "url">("upload");
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    files.forEach(file => {
+      if (file && referenceImages.length < 5) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            setReferenceImages([...referenceImages, event.target!.result as string]);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  };
+
+  const removeReferenceImage = (index: number) => {
+    setReferenceImages(referenceImages.filter((_, i) => i !== index));
+  };
   return (
     <div className="space-y-4">
       <Card>
@@ -1387,14 +1510,155 @@ const EnhancedLeafInspector: React.FC<EnhancedLeafInspectorProps> = ({
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label>Reference Image URL (Optional)</Label>
-                <Input
-                  value={referenceImageUrl}
-                  onChange={(e) => setReferenceImageUrl(e.target.value)}
-                  placeholder="Reference image URL..."
-                />
+              {/* Enhanced Reference Images Section */}
+              <div className="space-y-3 border border-border rounded-lg p-4">
+                <Label className="text-sm font-medium">Reference Images</Label>
+                <Tabs value={referenceMode} onValueChange={(value) => setReferenceMode(value as "upload" | "url")}>
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="upload">Upload Files</TabsTrigger>
+                    <TabsTrigger value="url">Image URL</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="upload" className="space-y-3">
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Upload up to 5 reference images</Label>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleImageUpload}
+                        className="cursor-pointer"
+                      />
+                    </div>
+                    
+                    {referenceImages.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {referenceImages.map((image, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={image}
+                              alt={`Reference ${index + 1}`}
+                              className="w-full h-20 object-cover rounded border border-border"
+                            />
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => removeReferenceImage(index)}
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="url" className="space-y-2">
+                    <Input
+                      value={referenceImageUrl}
+                      onChange={(e) => setReferenceImageUrl(e.target.value)}
+                      placeholder="https://example.com/image.jpg"
+                    />
+                    {referenceImageUrl && (
+                      <div className="relative">
+                        <img
+                          src={referenceImageUrl}
+                          alt="Reference preview"
+                          className="w-full h-32 object-cover rounded border border-border"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
               </div>
+
+              {/* Advanced Generation Settings */}
+              <details className="border border-border rounded-lg">
+                <summary className="p-3 cursor-pointer font-medium hover:bg-muted/50">
+                  Advanced Settings
+                </summary>
+                <div className="p-3 pt-0 space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Output Format</Label>
+                      <Select value={outputFormat} onValueChange={setOutputFormat}>
+                        <SelectTrigger className="h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="png">PNG</SelectItem>
+                          <SelectItem value="jpg">JPG</SelectItem>
+                          <SelectItem value="webp">WebP</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-xs">Safety Tolerance</Label>
+                      <Select value={safetyTolerance.toString()} onValueChange={(value) => setSafetyTolerance(parseInt(value))}>
+                        <SelectTrigger className="h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Strict</SelectItem>
+                          <SelectItem value="2">Moderate</SelectItem>
+                          <SelectItem value="3">Relaxed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Prompt Upsampling</Label>
+                      <Switch
+                        checked={promptUpsampling}
+                        onCheckedChange={setPromptUpsampling}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs">Guidance Scale: {guidanceScale}</Label>
+                    <Slider
+                      value={[guidanceScale]}
+                      onValueChange={([value]) => setGuidanceScale(value)}
+                      min={1}
+                      max={20}
+                      step={0.5}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs">Inference Steps: {inferenceSteps}</Label>
+                    <Slider
+                      value={[inferenceSteps]}
+                      onValueChange={([value]) => setInferenceSteps(value)}
+                      min={1}
+                      max={50}
+                      step={1}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs">Image Strength: {Math.round(imageStrength * 100)}%</Label>
+                    <Slider
+                      value={[imageStrength]}
+                      onValueChange={([value]) => setImageStrength(value)}
+                      min={0.1}
+                      max={1}
+                      step={0.1}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              </details>
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-2">
@@ -1409,6 +1673,9 @@ const EnhancedLeafInspector: React.FC<EnhancedLeafInspectorProps> = ({
                       <SelectItem value="9:16">Portrait (9:16)</SelectItem>
                       <SelectItem value="4:3">Standard (4:3)</SelectItem>
                       <SelectItem value="3:2">Photo (3:2)</SelectItem>
+                      <SelectItem value="21:9">Ultrawide (21:9)</SelectItem>
+                      <SelectItem value="4:5">Portrait+ (4:5)</SelectItem>
+                      <SelectItem value="5:4">Square+ (5:4)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
