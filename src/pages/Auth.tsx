@@ -16,6 +16,8 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -30,23 +32,59 @@ const Auth = () => {
     checkAuth();
   }, [navigate]);
 
+  const validateForm = () => {
+    setEmailError('');
+    setPasswordError('');
+    
+    let isValid = true;
+    
+    if (!email || !email.includes('@')) {
+      setEmailError('Please enter a valid email address');
+      isValid = false;
+    }
+    
+    if (!password || password.length < 6) {
+      setPasswordError('Password must be at least 6 characters long');
+      isValid = false;
+    }
+    
+    return isValid;
+  };
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+    
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
+      // Clear any existing session first
+      await supabase.auth.signOut();
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
         password,
       });
 
       if (error) {
+        console.error('Sign in error:', error);
+        
+        let errorMessage = error.message;
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Please check your email and click the confirmation link before signing in.';
+        }
+        
         toast({
           title: "Sign In Failed",
-          description: error.message,
+          description: errorMessage,
           variant: "destructive",
         });
-      } else {
+      } else if (data.user) {
         toast({
           title: "Welcome back!",
           description: "You have been successfully signed in.",
@@ -54,9 +92,10 @@ const Auth = () => {
         navigate('/');
       }
     } catch (error) {
+      console.error('Unexpected error:', error);
       toast({
-        title: "An error occurred",
-        description: "Please try again later.",
+        title: "Connection Error",
+        description: "Unable to connect to the server. Please check your internet connection and try again.",
         variant: "destructive",
       });
     } finally {
@@ -66,39 +105,64 @@ const Auth = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm() || !displayName.trim()) {
+      if (!displayName.trim()) {
+        toast({
+          title: "Display Name Required",
+          description: "Please enter a display name",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+    
     setLoading(true);
 
     try {
       const redirectUrl = `${window.location.origin}/`;
       
-      const { error } = await supabase.auth.signUp({
-        email,
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
         password,
         options: {
           emailRedirectTo: redirectUrl,
           data: {
-            display_name: displayName,
+            display_name: displayName.trim(),
           }
         }
       });
 
       if (error) {
+        console.error('Sign up error:', error);
+        
+        let errorMessage = error.message;
+        if (error.message.includes('User already registered')) {
+          errorMessage = 'An account with this email already exists. Please sign in instead.';
+          setActiveTab('signin');
+        }
+        
         toast({
           title: "Sign Up Failed",
-          description: error.message,
+          description: errorMessage,
           variant: "destructive",
         });
-      } else {
+      } else if (data.user) {
         toast({
           title: "Account Created!",
-          description: "Please check your email for verification.",
+          description: "Please check your email for verification, then sign in.",
         });
         setActiveTab('signin');
+        // Clear form
+        setEmail('');
+        setPassword('');
+        setDisplayName('');
       }
     } catch (error) {
+      console.error('Unexpected error:', error);
       toast({
-        title: "An error occurred",
-        description: "Please try again later.",
+        title: "Connection Error",
+        description: "Unable to connect to the server. Please check your internet connection and try again.",
         variant: "destructive",
       });
     } finally {
@@ -131,9 +195,16 @@ const Auth = () => {
                     type="email"
                     placeholder="Enter your email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setEmailError('');
+                    }}
                     required
+                    className={emailError ? 'border-destructive' : ''}
                   />
+                  {emailError && (
+                    <p className="text-sm text-destructive">{emailError}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signin-password">Password</Label>
@@ -143,8 +214,12 @@ const Auth = () => {
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setPasswordError('');
+                      }}
                       required
+                      className={passwordError ? 'border-destructive' : ''}
                     />
                     <Button
                       type="button"
@@ -160,6 +235,9 @@ const Auth = () => {
                       )}
                     </Button>
                   </div>
+                  {passwordError && (
+                    <p className="text-sm text-destructive">{passwordError}</p>
+                  )}
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -188,9 +266,16 @@ const Auth = () => {
                     type="email"
                     placeholder="Enter your email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setEmailError('');
+                    }}
                     required
+                    className={emailError ? 'border-destructive' : ''}
                   />
+                  {emailError && (
+                    <p className="text-sm text-destructive">{emailError}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Password</Label>
@@ -200,9 +285,13 @@ const Auth = () => {
                       type={showPassword ? "text" : "password"}
                       placeholder="Create a password"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setPasswordError('');
+                      }}
                       required
                       minLength={6}
+                      className={passwordError ? 'border-destructive' : ''}
                     />
                     <Button
                       type="button"
@@ -218,9 +307,13 @@ const Auth = () => {
                       )}
                     </Button>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Password must be at least 6 characters long
-                  </p>
+                  {passwordError ? (
+                    <p className="text-sm text-destructive">{passwordError}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Password must be at least 6 characters long
+                    </p>
+                  )}
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
