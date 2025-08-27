@@ -14,7 +14,170 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      characters: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          reference_images: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          reference_images?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          reference_images?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      generated_images: {
+        Row: {
+          aspect_ratio: string | null
+          character_id: string | null
+          character_name: string | null
+          created_at: string
+          id: string
+          image_url: string
+          output_format: string | null
+          prediction_id: string | null
+          project_id: string | null
+          prompt: string
+          prompt_upsampling: boolean | null
+          reference_image_url: string | null
+          safety_tolerance: number | null
+          seed: number | null
+          status: string
+          use_reference: boolean | null
+          user_id: string
+        }
+        Insert: {
+          aspect_ratio?: string | null
+          character_id?: string | null
+          character_name?: string | null
+          created_at?: string
+          id?: string
+          image_url: string
+          output_format?: string | null
+          prediction_id?: string | null
+          project_id?: string | null
+          prompt: string
+          prompt_upsampling?: boolean | null
+          reference_image_url?: string | null
+          safety_tolerance?: number | null
+          seed?: number | null
+          status?: string
+          use_reference?: boolean | null
+          user_id: string
+        }
+        Update: {
+          aspect_ratio?: string | null
+          character_id?: string | null
+          character_name?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string
+          output_format?: string | null
+          prediction_id?: string | null
+          project_id?: string | null
+          prompt?: string
+          prompt_upsampling?: boolean | null
+          reference_image_url?: string | null
+          safety_tolerance?: number | null
+          seed?: number | null
+          status?: string
+          use_reference?: boolean | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_images_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          created_at: string
+          data: Json
+          description: string | null
+          id: string
+          is_template: boolean | null
+          name: string
+          thumbnail_url: string | null
+          updated_at: string
+          user_id: string
+          version: number | null
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          description?: string | null
+          id?: string
+          is_template?: boolean | null
+          name: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id: string
+          version?: number | null
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          description?: string | null
+          id?: string
+          is_template?: boolean | null
+          name?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id?: string
+          version?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
