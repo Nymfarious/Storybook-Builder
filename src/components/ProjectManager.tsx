@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Save, FolderOpen, Copy, Trash2, FileText, Clock, Download, Upload } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 export interface ProjectData {
   id: string;
@@ -32,93 +34,131 @@ interface ProjectManagerProps {
   onSaveProject?: (project: ProjectData) => void;
 }
 
-const STORAGE_KEY = 'graphic-novel-projects';
-
 export const ProjectManager: React.FC<ProjectManagerProps> = ({
   currentProject,
   onLoadProject,
   onSaveProject
 }) => {
+  const { user } = useAuth();
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [projectName, setProjectName] = useState('');
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Load projects from localStorage on mount
+  // Load projects from Supabase on mount
   useEffect(() => {
-    const savedProjects = localStorage.getItem(STORAGE_KEY);
-    if (savedProjects) {
-      try {
-        const parsed = JSON.parse(savedProjects).map((p: any) => ({
-          ...p,
-          createdAt: new Date(p.createdAt),
-          updatedAt: new Date(p.updatedAt)
-        }));
-        setProjects(parsed);
-      } catch (error) {
-        console.error('Failed to load projects:', error);
-      }
+    if (user) {
+      loadProjectsFromSupabase();
     }
-  }, []);
+  }, [user]);
 
-  // Save projects to localStorage
-  const saveProjectsToStorage = (projectsToSave: ProjectData[]) => {
+  const loadProjectsFromSupabase = async () => {
+    if (!user) return;
+    
+    setLoading(true);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(projectsToSave));
-      setProjects(projectsToSave);
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedProjects = data.map((project: any) => ({
+        id: project.id,
+        name: project.name,
+        pages: project.data.pages || [],
+        characters: project.data.characters || [],
+        images: project.data.images || [],
+        settings: project.data.settings || {
+          gutter: 20,
+          pageSize: 'A4',
+          orientation: 'portrait'
+        },
+        createdAt: new Date(project.created_at),
+        updatedAt: new Date(project.updated_at),
+        version: project.version || 1
+      }));
+
+      setProjects(formattedProjects);
     } catch (error) {
-      console.error('Failed to save projects:', error);
-      toast.error('Failed to save projects to local storage');
+      console.error('Failed to load projects:', error);
+      toast.error('Failed to load projects from cloud');
     }
+    setLoading(false);
   };
 
   const generateProjectId = () => {
     return `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   };
 
-  const handleSaveProject = (saveAs: boolean = false) => {
+  const handleSaveProject = async (saveAs: boolean = false) => {
+    if (!user) {
+      toast.error('Please log in to save projects');
+      return;
+    }
+
     if (!projectName.trim()) {
       toast.error('Please enter a project name');
       return;
     }
 
-    const existingProject = projects.find(p => p.name === projectName);
-    
-    if (existingProject && !saveAs) {
-      // Update existing project
-      const updatedProject: ProjectData = {
-        ...existingProject,
-        ...currentProject,
-        name: projectName,
-        updatedAt: new Date(),
-        version: existingProject.version + 1
-      };
+    setLoading(true);
+    try {
+      const existingProject = projects.find(p => p.name === projectName);
+      
+      if (existingProject && !saveAs) {
+        // Update existing project
+        const { error } = await supabase
+          .from('projects')
+          .update({
+            name: projectName,
+            data: {
+              pages: currentProject.pages,
+              characters: currentProject.characters,
+              images: currentProject.images,
+              settings: currentProject.settings
+            },
+            version: existingProject.version + 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingProject.id);
 
-      const updatedProjects = projects.map(p => 
-        p.id === existingProject.id ? updatedProject : p
-      );
+        if (error) throw error;
 
-      saveProjectsToStorage(updatedProjects);
-      onSaveProject?.(updatedProject);
-      toast.success('Project updated successfully!');
-    } else {
-      // Create new project
-      const newProject: ProjectData = {
-        id: generateProjectId(),
-        ...currentProject,
-        name: projectName,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        version: 1
-      };
+        toast.success('Project updated successfully!');
+      } else {
+        // Create new project
+        const { error } = await supabase
+          .from('projects')
+          .insert({
+            name: projectName,
+            user_id: user.id,
+            data: {
+              pages: currentProject.pages,
+              characters: currentProject.characters,
+              images: currentProject.images,
+              settings: currentProject.settings
+            },
+            version: 1
+          });
 
-      const updatedProjects = [...projects, newProject];
-      saveProjectsToStorage(updatedProjects);
-      onSaveProject?.(newProject);
-      toast.success('Project saved successfully!');
+        if (error) throw error;
+
+        toast.success('Project saved successfully!');
+      }
+
+      // Reload projects
+      await loadProjectsFromSupabase();
+    } catch (error) {
+      console.error('Failed to save project:', error);
+      toast.error('Failed to save project to cloud');
     }
 
+    setLoading(false);
     setSaveDialogOpen(false);
     setProjectName('');
   };
@@ -129,25 +169,61 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
     toast.success(`Loaded project: ${project.name}`);
   };
 
-  const handleDuplicateProject = (project: ProjectData) => {
-    const duplicatedProject: ProjectData = {
-      ...project,
-      id: generateProjectId(),
-      name: `${project.name} (Copy)`,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      version: 1
-    };
+  const handleDuplicateProject = async (project: ProjectData) => {
+    if (!user) {
+      toast.error('Please log in to duplicate projects');
+      return;
+    }
 
-    const updatedProjects = [...projects, duplicatedProject];
-    saveProjectsToStorage(updatedProjects);
-    toast.success('Project duplicated successfully!');
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .insert({
+          name: `${project.name} (Copy)`,
+          user_id: user.id,
+          data: {
+            pages: project.pages,
+            characters: project.characters,
+            images: project.images,
+            settings: project.settings
+          },
+          version: 1
+        });
+
+      if (error) throw error;
+
+      toast.success('Project duplicated successfully!');
+      await loadProjectsFromSupabase();
+    } catch (error) {
+      console.error('Failed to duplicate project:', error);
+      toast.error('Failed to duplicate project');
+    }
+    setLoading(false);
   };
 
-  const handleDeleteProject = (projectId: string) => {
-    const updatedProjects = projects.filter(p => p.id !== projectId);
-    saveProjectsToStorage(updatedProjects);
-    toast.success('Project deleted successfully!');
+  const handleDeleteProject = async (projectId: string) => {
+    if (!user) {
+      toast.error('Please log in to delete projects');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId);
+
+      if (error) throw error;
+
+      toast.success('Project deleted successfully!');
+      await loadProjectsFromSupabase();
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+      toast.error('Failed to delete project');
+    }
+    setLoading(false);
   };
 
   const handleExportProject = (project: ProjectData) => {
@@ -168,28 +244,48 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
     }
   };
 
-  const handleImportProject = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportProject = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user) {
+      toast.error('Please log in to import projects');
+      return;
+    }
+
     const file = event.target.files?.[0];
     if (!file) return;
 
+    setLoading(true);
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const projectData = JSON.parse(e.target?.result as string);
-        const importedProject: ProjectData = {
-          ...projectData,
-          id: generateProjectId(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          version: 1
-        };
+        
+        const { error } = await supabase
+          .from('projects')
+          .insert({
+            name: projectData.name || 'Imported Project',
+            user_id: user.id,
+            data: {
+              pages: projectData.pages || [],
+              characters: projectData.characters || [],
+              images: projectData.images || [],
+              settings: projectData.settings || {
+                gutter: 20,
+                pageSize: 'A4',
+                orientation: 'portrait'
+              }
+            },
+            version: 1
+          });
 
-        const updatedProjects = [...projects, importedProject];
-        saveProjectsToStorage(updatedProjects);
+        if (error) throw error;
+
         toast.success('Project imported successfully!');
+        await loadProjectsFromSupabase();
       } catch (error) {
+        console.error('Failed to import project:', error);
         toast.error('Failed to import project - invalid file format');
       }
+      setLoading(false);
     };
     reader.readAsText(file);
     event.target.value = ''; // Reset input
@@ -228,8 +324,8 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
               <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={() => handleSaveProject(false)}>
-                Save Project
+              <Button onClick={() => handleSaveProject(false)} disabled={loading || !user}>
+                {loading ? 'Saving...' : 'Save Project'}
               </Button>
             </div>
           </div>
