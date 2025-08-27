@@ -20,6 +20,8 @@ import { ImageHistory } from '@/components/ImageHistory';
 import { ImagePickerModal } from '@/components/ImagePickerModal';
 import { SpeechBubble, SpeechBubbleInspector } from '@/components/SpeechBubble';
 import { ProjectManager } from '@/components/ProjectManager';
+import { CloudProjectManager } from '@/components/CloudProjectManager';
+import UserMenu from '@/components/UserMenu';
 import { DraggableResizer } from '@/components/DraggableResizer';
 import { EnhancedBatchGenerator } from '@/components/EnhancedBatchGenerator';
 import { Character, GeneratedImage, GenerationJob } from '@/types';
@@ -864,16 +866,33 @@ const GraphicNovelBuilder = () => {
             </TabsList>
 
             <TabsContent value="builder" className="space-y-6">
-              {/* Header */}
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                  Graphic Novel Builder
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  Create beautiful layouts with AI-powered content
-                </p>
+              {/* Header with User Menu */}
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">Graphic Novel Builder</h2>
+                <UserMenu />
               </div>
-
+              
+              {/* Cloud Project Manager */}
+              <CloudProjectManager
+                currentProject={{
+                  pages,
+                  selectedPage,
+                  zoom,
+                  characters,
+                  generatedImages
+                }}
+                onLoadProject={(data) => {
+                  if (data.pages) setPages(data.pages);
+                  if (data.selectedPage !== undefined) setSelectedPage(data.selectedPage);
+                  if (data.zoom !== undefined) setZoom(data.zoom);
+                  if (data.characters) setCharacters(data.characters);
+                  if (data.generatedImages) setGeneratedImages(data.generatedImages);
+                }}
+                onSaveProject={() => {
+                  // Auto-save functionality can be added here
+                }}
+              />
+              
               {/* Quick Actions */}
               <div className="space-y-3">
                 <h4 className="text-sm font-semibold text-foreground">Quick Actions</h4>

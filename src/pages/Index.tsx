@@ -8,6 +8,7 @@ import { ImageGenerator } from '@/components/ImageGenerator';
 import { Gallery } from '@/components/Gallery';
 import { BatchGenerator } from '@/components/BatchGenerator';
 import { ImageHistory } from '@/components/ImageHistory';
+import UserMenu from '@/components/UserMenu';
 
 import { Character, GeneratedImage, GenerationJob } from '@/types';
 import { ReplicateService } from '@/services/replicate';
@@ -191,6 +192,11 @@ const Index = () => {
         
         <div className="relative container mx-auto px-4 py-20 text-center">
           <div className="max-w-4xl mx-auto space-y-8">
+            {/* User Menu */}
+            <div className="absolute top-4 right-4">
+              <UserMenu />
+            </div>
+            
             <div className="space-y-4">
               <h1 className="text-4xl md:text-6xl font-bold text-foreground">
                 AI Character{' '}

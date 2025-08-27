@@ -54,6 +54,29 @@ export default {
 					foreground: 'hsl(var(--card-foreground))'
 				}
 			},
+			fontFamily: {
+				sans: ["Inter", "sans-serif"],
+				// Comic Fonts
+				'bangers': ['Bangers', 'cursive'],
+				'creepster': ['Creepster', 'cursive'],
+				'nosifer': ['Nosifer', 'cursive'],
+				'bungee': ['Bungee', 'cursive'],
+				// Serif Fonts
+				'playfair': ['Playfair Display', 'serif'],
+				'crimson': ['Crimson Text', 'serif'],
+				'lora': ['Lora', 'serif'],
+				'merriweather': ['Merriweather', 'serif'],
+				// Sans-Serif Fonts
+				'open-sans': ['Open Sans', 'sans-serif'],
+				'roboto': ['Roboto', 'sans-serif'],
+				'montserrat': ['Montserrat', 'sans-serif'],
+				'poppins': ['Poppins', 'sans-serif'],
+				// Display Fonts
+				'fredoka': ['Fredoka One', 'cursive'],
+				'righteous': ['Righteous', 'cursive'],
+				'orbitron': ['Orbitron', 'sans-serif'],
+				'anton': ['Anton', 'sans-serif'],
+			},
 			backgroundImage: {
 				'gradient-primary': 'var(--gradient-primary)',
 				'gradient-card': 'var(--gradient-card)',
