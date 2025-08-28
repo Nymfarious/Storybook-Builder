@@ -25,6 +25,8 @@ import UserMenu from '@/components/UserMenu';
 import { DraggableResizer } from '@/components/DraggableResizer';
 import { EnhancedBatchGenerator } from '@/components/EnhancedBatchGenerator';
 import { SavePageModal } from '@/components/SavePageModal';
+import { TextGenerationControls } from '@/components/TextGenerationControls';
+import { EnhancedLeafInspector } from '@/components/EnhancedLeafInspector';
 import { Character, GeneratedImage, GenerationJob, SavedPage } from '@/types';
 import { ReplicateService } from '@/services/replicate';
 import { 
