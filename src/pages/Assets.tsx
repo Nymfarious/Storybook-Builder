@@ -1,27 +1,131 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CharacterManager } from '@/components/CharacterManager';
 import UserMenu from '@/components/UserMenu';
 import { Character } from '@/types';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 const Assets = () => {
+  const { user } = useAuth();
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const addCharacter = useCallback((characterData: Omit<Character, 'id' | 'createdAt'>) => {
-    const newCharacter: Character = {
-      ...characterData,
-      id: crypto.randomUUID(),
-      createdAt: new Date()
-    };
-    setCharacters(prev => [...prev, newCharacter]);
-    toast.success(`Character "${newCharacter.name}" created successfully!`);
-  }, []);
+  const loadCharacters = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('characters')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-  const deleteCharacter = useCallback((id: string) => {
-    setCharacters(prev => prev.filter(c => c.id !== id));
-    toast.success('Character deleted successfully!');
-  }, []);
+      if (error) throw error;
+
+      const mappedCharacters: Character[] = data.map(char => ({
+        id: char.id,
+        name: char.name,
+        notes: char.notes || '',
+        referenceImages: char.reference_images || [],
+        createdAt: new Date(char.created_at)
+      }));
+
+      setCharacters(mappedCharacters);
+    } catch (error) {
+      console.error('Error loading characters:', error);
+      toast.error('Failed to load characters');
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadCharacters();
+  }, [loadCharacters]);
+
+  const addCharacter = useCallback(async (characterData: Omit<Character, 'id' | 'createdAt'>) => {
+    if (!user) {
+      toast.error('Please log in to save characters');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('characters')
+        .insert({
+          user_id: user.id,
+          name: characterData.name,
+          notes: characterData.notes,
+          reference_images: characterData.referenceImages
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newCharacter: Character = {
+        id: data.id,
+        name: data.name,
+        notes: data.notes || '',
+        referenceImages: data.reference_images || [],
+        createdAt: new Date(data.created_at)
+      };
+
+      setCharacters(prev => [newCharacter, ...prev]);
+      toast.success(`Character "${newCharacter.name}" created successfully!`);
+    } catch (error) {
+      console.error('Error creating character:', error);
+      toast.error('Failed to create character');
+    }
+  }, [user]);
+
+  const deleteCharacter = useCallback(async (id: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('characters')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setCharacters(prev => prev.filter(c => c.id !== id));
+      toast.success('Character deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting character:', error);
+      toast.error('Failed to delete character');
+    }
+  }, [user]);
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center py-8">
+            <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+            <p className="text-muted-foreground">Please log in to manage your assets.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center py-8">
+            <h2 className="text-xl font-semibold mb-2">Loading Assets...</h2>
+            <p className="text-muted-foreground">Please wait while we load your characters.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
