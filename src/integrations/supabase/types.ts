@@ -180,31 +180,46 @@ export type Database = {
       }
       saved_pages: {
         Row: {
+          aspect_ratio: string | null
           created_at: string
           description: string | null
           id: string
           image_url: string
+          layout_metadata: Json | null
+          original_height: number | null
+          original_width: number | null
           page_data: Json
+          page_type: string | null
           title: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          aspect_ratio?: string | null
           created_at?: string
           description?: string | null
           id?: string
           image_url: string
+          layout_metadata?: Json | null
+          original_height?: number | null
+          original_width?: number | null
           page_data?: Json
+          page_type?: string | null
           title: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          aspect_ratio?: string | null
           created_at?: string
           description?: string | null
           id?: string
           image_url?: string
+          layout_metadata?: Json | null
+          original_height?: number | null
+          original_width?: number | null
           page_data?: Json
+          page_type?: string | null
           title?: string
           updated_at?: string
           user_id?: string

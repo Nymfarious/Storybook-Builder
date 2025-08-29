@@ -18,6 +18,11 @@ interface SavedPage {
   image_url: string;
   page_data: any;
   created_at: string;
+  original_width?: number;
+  original_height?: number;
+  aspect_ratio?: string;
+  page_type?: string;
+  layout_metadata?: any;
 }
 
 interface Storybook {
@@ -317,6 +322,10 @@ export default function SavedPages() {
                         src={page.image_url}
                         alt={page.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        style={{
+                          // Preserve original format if available
+                          objectFit: page.original_width && page.original_height ? 'contain' : 'cover'
+                        }}
                       />
                       {selectedPages.has(page.id) && (
                         <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
@@ -342,12 +351,15 @@ export default function SavedPages() {
                       </div>
                     </div>
                     <div className="p-4">
-                      <h3 className="font-semibold mb-1 truncate">{page.title}</h3>
+                      <h3 className="font-semibold text-sm line-clamp-2">{page.title}</h3>
                       {page.description && (
-                        <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{page.description}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-1 mt-1">{page.description}</p>
                       )}
-                      <p className="text-xs text-muted-foreground">
-                        Saved {new Date(page.created_at).toLocaleDateString()}
+                      {page.aspect_ratio && (
+                        <p className="text-xs text-muted-foreground/60 mt-1">Format: {page.aspect_ratio}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {new Date(page.created_at).toLocaleDateString()}
                       </p>
                     </div>
                   </CardContent>

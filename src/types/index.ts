@@ -14,6 +14,11 @@ export interface SavedPage {
   pageData: any; // Store the page structure
   createdAt: Date;
   userId?: string;
+  originalWidth?: number;
+  originalHeight?: number;
+  aspectRatio?: string;
+  pageType?: string;
+  layoutMetadata?: any;
 }
 
 export interface GeneratedImage {

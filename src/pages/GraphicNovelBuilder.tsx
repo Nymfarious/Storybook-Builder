@@ -954,12 +954,13 @@ const GraphicNovelBuilder = () => {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="builder" className="space-y-6">
-              {/* Header with User Menu */}
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Graphic Novel Builder</h2>
-                <UserMenu />
-              </div>
+            <TabsContent value="builder" className="flex-1 overflow-y-auto">
+              <div className="p-4 space-y-6">
+                {/* Header with User Menu */}
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">Graphic Novel Builder</h2>
+                  <UserMenu />
+                </div>
               
               {/* Cloud Project Manager */}
               <CloudProjectManager
@@ -1143,27 +1144,30 @@ const GraphicNovelBuilder = () => {
                     </Button>
                   ))}
                 </div>
+                </div>
               </div>
             </TabsContent>
 
-            <TabsContent value="characters" className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">Characters</h2>
-                <p className="text-sm text-muted-foreground">Manage your character library</p>
+            <TabsContent value="characters" className="flex-1 overflow-y-auto">
+              <div className="p-4 space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold">Characters</h2>
+                  <p className="text-sm text-muted-foreground">Manage your character library</p>
+                </div>
+                <CharacterManager
+                  characters={characters}
+                  onAddCharacter={addCharacter}
+                  onDeleteCharacter={deleteCharacter}
+                />
               </div>
-              <CharacterManager
-                characters={characters}
-                onAddCharacter={addCharacter}
-                onDeleteCharacter={deleteCharacter}
-              />
             </TabsContent>
 
-            <TabsContent value="history" className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">Generation History</h2>
-                <p className="text-sm text-muted-foreground">Track your AI generations</p>
-              </div>
-              <div className="max-h-96 overflow-y-auto">
+            <TabsContent value="history" className="flex-1 overflow-y-auto">
+              <div className="p-4 space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold">Generation History</h2>
+                  <p className="text-sm text-muted-foreground">Track your AI generations</p>
+                </div>
                 <ImageHistory
                   images={generatedImages}
                   characters={characters}
@@ -1171,43 +1175,48 @@ const GraphicNovelBuilder = () => {
               </div>
             </TabsContent>
 
-            <TabsContent value="gallery" className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">Gallery</h2>
-                <p className="text-sm text-muted-foreground">Browse images and saved pages</p>
-              </div>
-              
-              <div className="space-y-4">
-                {/* Saved Pages Section */}
-                {savedPages.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium">Saved Pages ({savedPages.length})</h3>
-                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                      {savedPages.map((page) => (
-                        <div key={page.id} className="group relative">
-                          <div className="aspect-[0.707] rounded border border-border overflow-hidden bg-muted">
-                            <img
-                              src={page.imageUrl}
-                              alt={page.title}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/75 text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <div className="font-medium truncate">{page.title}</div>
-                            {page.description && (
-                              <div className="text-muted-foreground truncate">{page.description}</div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+            <TabsContent value="gallery" className="flex-1 overflow-y-auto">
+              <div className="p-4 space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold">Gallery</h2>
+                  <p className="text-sm text-muted-foreground">Browse images and saved pages</p>
+                </div>
                 
-                {/* Images Section */}
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Generated Images ({generatedImages.length})</h3>
-                  <div className="max-h-48 overflow-y-auto">
+                <div className="space-y-4">
+                  {/* Saved Pages Section */}
+                  {savedPages.length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium">Saved Pages ({savedPages.length})</h3>
+                      <div className="grid grid-cols-2 gap-2">
+                        {savedPages.slice(0, 6).map((page) => (
+                          <div key={page.id} className="group relative">
+                            <div className="aspect-[0.707] rounded border border-border overflow-hidden bg-muted">
+                              <img
+                                src={page.imageUrl}
+                                alt={page.title}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/75 text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="font-medium truncate">{page.title}</div>
+                              {page.description && (
+                                <div className="text-muted-foreground truncate">{page.description}</div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {savedPages.length > 6 && (
+                        <p className="text-xs text-muted-foreground text-center">
+                          +{savedPages.length - 6} more pages in gallery
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Images Section */}
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Generated Images ({generatedImages.length})</h3>
                     <Gallery
                       images={generatedImages}
                       characters={characters}
@@ -1267,8 +1276,9 @@ const GraphicNovelBuilder = () => {
 
       {/* Right Inspector */}
       {showRight && (
-        <div className="w-80 border-l border-border bg-card shadow-card overflow-y-auto">
-          <div className="p-4 space-y-6">
+        <div className="w-80 border-l border-border bg-card shadow-card flex flex-col">
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-4 space-y-6">
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                 Inspector
@@ -1336,6 +1346,7 @@ const GraphicNovelBuilder = () => {
                 onChange={(updater) => updatePage(selectedPage, prev => updateNode(prev, selectedNode.id, updater) as SplitNode)} 
               />
             )}
+            </div>
           </div>
         </div>
       )}

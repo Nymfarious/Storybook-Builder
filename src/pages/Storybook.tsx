@@ -14,6 +14,11 @@ interface SavedPage {
   image_url: string;
   page_data: any;
   created_at: string;
+  original_width?: number;
+  original_height?: number;
+  aspect_ratio?: string;
+  page_type?: string;
+  layout_metadata?: any;
 }
 
 interface Storybook {
@@ -166,19 +171,32 @@ export default function Storybook() {
       {/* Storybook Reader */}
       <div className="flex items-center justify-center p-4" style={{ height: isFullscreen ? '100vh' : 'calc(100vh - 80px)' }}>
         <div className="relative max-w-4xl w-full">
-          {/* Page Container with 3D book effect */}
+          {/* Page Container with format preservation */}
           <div className="relative mx-auto" style={{ perspective: '1200px' }}>
-            <Card className={`
-              relative w-full aspect-[3/4] max-h-[80vh] mx-auto overflow-hidden
-              shadow-2xl transition-transform duration-300
-              ${pageFlipping ? 'animate-scale-out' : 'animate-scale-in'}
-            `}>
+            <Card 
+              className={`
+                relative mx-auto overflow-hidden
+                shadow-2xl transition-transform duration-300
+                ${pageFlipping ? 'animate-scale-out' : 'animate-scale-in'}
+              `}
+              style={{
+                // Preserve original page aspect ratio if available
+                aspectRatio: currentPage.aspect_ratio || '3/4',
+                maxHeight: '85vh',
+                maxWidth: '90vw'
+              }}
+            >
               {/* Page Image */}
               <div className="relative w-full h-full">
                 <img
                   src={currentPage.image_url}
                   alt={currentPage.title}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full"
+                  style={{
+                    // Preserve original format without distortion
+                    objectFit: currentPage.original_width && currentPage.original_height ? 'contain' : 'cover',
+                    backgroundColor: '#ffffff'
+                  }}
                 />
                 
                 {/* Page Info Overlay */}
