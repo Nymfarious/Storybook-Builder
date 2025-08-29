@@ -13,6 +13,8 @@ import GraphicNovelBuilder from "./pages/GraphicNovelBuilder";
 import Assets from "./pages/Assets";  
 import Settings from "./pages/Settings";
 import Props from "./pages/Props";
+import SavedPages from "./pages/SavedPages";
+import Storybook from "./pages/Storybook";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +50,16 @@ const App = () => (
             <Route path="/props" element={
               <ProtectedRoute>
                 <Props />
+              </ProtectedRoute>
+            } />
+            <Route path="/saved-pages" element={
+              <ProtectedRoute>
+                <SavedPages />
+              </ProtectedRoute>
+            } />
+            <Route path="/storybook/:id" element={
+              <ProtectedRoute>
+                <Storybook />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

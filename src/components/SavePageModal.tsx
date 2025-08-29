@@ -7,11 +7,13 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SavePageModalProps {
   pageElement: HTMLElement | null;
   pageData: any;
-  onSave: (pageInfo: { title: string; description: string; imageUrl: string; pageData: any }) => void;
+  onSave: (pageInfo: { title: string; description: string; imageUrl: string; pageData: any; id?: string }) => void;
 }
 
 export const SavePageModal: React.FC<SavePageModalProps> = ({
@@ -23,6 +25,7 @@ export const SavePageModal: React.FC<SavePageModalProps> = ({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isCapturing, setIsCapturing] = useState(false);
+  const { user } = useAuth();
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -32,6 +35,11 @@ export const SavePageModal: React.FC<SavePageModalProps> = ({
 
     if (!pageElement) {
       toast.error('Page element not found');
+      return;
+    }
+
+    if (!user) {
+      toast.error('Please sign in to save pages');
       return;
     }
 
@@ -46,23 +54,60 @@ export const SavePageModal: React.FC<SavePageModalProps> = ({
         backgroundColor: '#ffffff'
       });
 
-      const imageUrl = canvas.toDataURL('image/png');
+      // Convert canvas to blob
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+        }, 'image/png');
+      });
 
-      // Save the page
+      if (!blob) throw new Error('Failed to create image blob');
+
+      // Upload image to Supabase Storage
+      const fileName = `${user.id}/${Date.now()}-${title.trim().replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('page-images')
+        .upload(fileName, blob);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL for the uploaded image
+      const { data: { publicUrl } } = supabase.storage
+        .from('page-images')
+        .getPublicUrl(fileName);
+
+      // Save page data to database
+      const { data: savedPage, error: saveError } = await supabase
+        .from('saved_pages')
+        .insert({
+          user_id: user.id,
+          title: title.trim(),
+          description: description.trim(),
+          image_url: publicUrl,
+          page_data: pageData
+        })
+        .select()
+        .single();
+
+      if (saveError) throw saveError;
+
+      // Call the onSave callback with the saved page data
       onSave({
         title: title.trim(),
         description: description.trim(),
-        imageUrl,
-        pageData: JSON.parse(JSON.stringify(pageData))
+        imageUrl: publicUrl,
+        pageData,
+        id: savedPage.id
       });
 
-      toast.success('Page saved to gallery!');
+      toast.success('Page saved to cloud successfully!');
       setIsOpen(false);
       setTitle('');
       setDescription('');
     } catch (error) {
-      console.error('Error capturing page:', error);
-      toast.error('Failed to capture page image');
+      console.error('Error saving page:', error);
+      toast.error('Failed to save page to cloud');
     } finally {
       setIsCapturing(false);
     }

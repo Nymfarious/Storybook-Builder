@@ -190,10 +190,10 @@ const Index = () => {
                 </Link>
               </Button>
               <Button asChild variant="outline" className="h-auto p-4 flex-col gap-2">
-                <Link to="/props">
+                <Link to="/saved-pages">
                   <Package className="h-6 w-6" />
-                  <span className="font-medium">Props</span>
-                  <span className="text-xs text-muted-foreground">Objects and items</span>
+                  <span className="font-medium">Storybooks</span>
+                  <span className="text-xs text-muted-foreground">Digital storybook gallery</span>
                 </Link>
               </Button>
               <Button asChild variant="outline" className="h-auto p-4 flex-col gap-2">

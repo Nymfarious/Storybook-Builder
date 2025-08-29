@@ -178,6 +178,111 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_pages: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string
+          page_data: Json
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url: string
+          page_data?: Json
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string
+          page_data?: Json
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      storybook_pages: {
+        Row: {
+          created_at: string
+          id: string
+          page_order: number
+          saved_page_id: string
+          storybook_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          page_order: number
+          saved_page_id: string
+          storybook_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          page_order?: number
+          saved_page_id?: string
+          storybook_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_storybook_pages_saved_page_id"
+            columns: ["saved_page_id"]
+            isOneToOne: false
+            referencedRelation: "saved_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_storybook_pages_storybook_id"
+            columns: ["storybook_id"]
+            isOneToOne: false
+            referencedRelation: "storybooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      storybooks: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_public: boolean | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

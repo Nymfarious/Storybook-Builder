@@ -920,9 +920,9 @@ const GraphicNovelBuilder = () => {
     setSelectedId("");
   };
 
-  const handleSavePage = (pageInfo: { title: string; description: string; imageUrl: string; pageData: any }) => {
+  const handleSavePage = (pageInfo: { title: string; description: string; imageUrl: string; pageData: any; id?: string }) => {
     const newSavedPage: SavedPage = {
-      id: crypto.randomUUID(),
+      id: pageInfo.id || crypto.randomUUID(),
       title: pageInfo.title,
       description: pageInfo.description,
       imageUrl: pageInfo.imageUrl,
@@ -931,6 +931,7 @@ const GraphicNovelBuilder = () => {
     };
     
     setSavedPages(prev => [newSavedPage, ...prev]);
+    // The SavePageModal component handles the cloud save and displays success toast
   };
 
   return (
