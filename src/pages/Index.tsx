@@ -2,8 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Sparkles, Users, Wand2, Images, Github, ExternalLink, Zap, History } from 'lucide-react';
-import { CharacterManager } from '@/components/CharacterManager';
+import { Sparkles, Users, Wand2, Images, Github, ExternalLink, Zap, History, Settings, Package } from 'lucide-react';
 import { ImageGenerator } from '@/components/ImageGenerator';
 import { Gallery } from '@/components/Gallery';
 import { BatchGenerator } from '@/components/BatchGenerator';
@@ -14,25 +13,15 @@ import { ReplicateService } from '@/services/replicate';
 import { GenerationQueue } from '@/components/GenerationQueue';
 import { toast } from 'sonner';
 import heroImage from '@/assets/hero-image.jpg';
+import { Link } from 'react-router-dom';
+
 const Index = () => {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [generationJobs, setGenerationJobs] = useState<GenerationJob[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const replicateService = useRef<ReplicateService>(new ReplicateService());
-  const addCharacter = useCallback((characterData: Omit<Character, 'id' | 'createdAt'>) => {
-    const newCharacter: Character = {
-      ...characterData,
-      id: crypto.randomUUID(),
-      createdAt: new Date()
-    };
-    setCharacters(prev => [...prev, newCharacter]);
-    toast.success(`Character "${newCharacter.name}" created successfully!`);
-  }, []);
-  const deleteCharacter = useCallback((id: string) => {
-    setCharacters(prev => prev.filter(c => c.id !== id));
-    toast.success('Character deleted successfully!');
-  }, []);
+  // Remove character management functions as they're now in Assets page
   const handleGenerate = useCallback(async (jobData: Omit<GenerationJob, 'id' | 'createdAt' | 'status'>) => {
     setIsGenerating(true);
     const character = jobData.characterId ? characters.find(c => c.id === jobData.characterId) : undefined;
@@ -180,27 +169,50 @@ const Index = () => {
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button asChild size="lg" className="text-lg px-8">
-                <a href="/graphic-novel-builder">
+                <Link to="/graphic-novel-builder">
                   📚 Try Graphic Novel Builder
-                </a>
+                </Link>
               </Button>
-              
+              <Button asChild size="lg" variant="outline" className="text-lg px-8">
+                <Link to="/assets">
+                  <Users className="h-5 w-5 mr-2" />
+                  Manage Assets
+                </Link>
+              </Button>
             </div>
             
-            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
+              <Button asChild variant="outline" className="h-auto p-4 flex-col gap-2">
+                <Link to="/assets">
+                  <Users className="h-6 w-6" />
+                  <span className="font-medium">Characters</span>
+                  <span className="text-xs text-muted-foreground">Manage your character library</span>
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="h-auto p-4 flex-col gap-2">
+                <Link to="/props">
+                  <Package className="h-6 w-6" />
+                  <span className="font-medium">Props</span>
+                  <span className="text-xs text-muted-foreground">Objects and items</span>
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="h-auto p-4 flex-col gap-2">
+                <Link to="/settings">
+                  <Settings className="h-6 w-6" />
+                  <span className="font-medium">Settings</span>
+                  <span className="text-xs text-muted-foreground">Configure preferences</span>
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Main Application */}
       <section className="container mx-auto px-4 py-12">
-        <Tabs defaultValue="characters" className="space-y-8">
+        <Tabs defaultValue="generate" className="space-y-8">
           <div className="flex justify-center">
-            <TabsList className="grid grid-cols-5 w-full max-w-2xl bg-card border-border shadow-card">
-              <TabsTrigger value="characters" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Users className="h-4 w-4 mr-2" />
-                Characters
-              </TabsTrigger>
+            <TabsList className="grid grid-cols-4 w-full max-w-2xl bg-card border-border shadow-card">
               <TabsTrigger value="generate" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Wand2 className="h-4 w-4 mr-2" />
                 Generate
@@ -219,10 +231,6 @@ const Index = () => {
               </TabsTrigger>
             </TabsList>
           </div>
-
-          <TabsContent value="characters" className="space-y-6">
-            <CharacterManager characters={characters} onAddCharacter={addCharacter} onDeleteCharacter={deleteCharacter} />
-          </TabsContent>
 
           <TabsContent value="generate" className="space-y-6">
             <div className="grid lg:grid-cols-2 gap-6">

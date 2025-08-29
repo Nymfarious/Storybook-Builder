@@ -10,6 +10,9 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import GraphicNovelBuilder from "./pages/GraphicNovelBuilder";
+import Assets from "./pages/Assets";  
+import Settings from "./pages/Settings";
+import Props from "./pages/Props";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +33,21 @@ const App = () => (
             <Route path="/graphic-novel-builder" element={
               <ProtectedRoute>
                 <GraphicNovelBuilder />
+              </ProtectedRoute>
+            } />
+            <Route path="/assets" element={
+              <ProtectedRoute>
+                <Assets />
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            } />
+            <Route path="/props" element={
+              <ProtectedRoute>
+                <Props />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
