@@ -324,6 +324,24 @@ const Auth = () => {
             </TabsContent>
           </Tabs>
         </CardContent>
+        
+        {true && (
+          <div className="px-6 pb-6">
+            <div className="pt-6 border-t border-border">
+              <Button 
+                type="button"
+                variant="outline" 
+                className="w-full border-dashed border-yellow-500 text-yellow-600 hover:bg-yellow-50"
+                onClick={() => {
+                  localStorage.setItem('dev_bypass', 'true');
+                  navigate('/');
+                }}
+              >
+                🔧 Dev Mode - Skip Login
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );
