@@ -16,7 +16,8 @@ import Settings from "./pages/Settings";
 import Props from "./pages/Props";
 import SavedPages from "./pages/SavedPages";
 import Storybook from "./pages/Storybook";
-import { MiniDevTools } from '@/components/MiniDevTools';  // ← ADD THIS
+import { MiniDevTools } from '@/components/MiniDevTools';
+import About from '@/pages/About';
 
 const queryClient = new QueryClient();
 
@@ -79,9 +80,10 @@ const App = () => (
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />
+			<Route path="/about" element={<About />} />
           </Routes>
         </BrowserRouter>
-        <MiniDevTools />  {/* ← ADD THIS - after BrowserRouter, inside TooltipProvider */}
+        <MiniDevTools />
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
