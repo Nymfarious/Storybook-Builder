@@ -1,315 +1,249 @@
 // src/components/MiniDevTools/MiniDevToolsPanel.tsx
 // Mëku Storybook Studio v2.1.0
-// Slide-out DevTools drawer with icon rail navigation
-// NO FRAMER-MOTION - uses CSS transitions instead
+// Main DevTools drawer with all panels
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
-  X, 
+  Eye, 
+  Volume2, 
+  Film, 
+  FileText, 
+  Code, 
+  Network, 
+  Bot, 
+  TestTube, 
+  Map, 
+  Palette, 
+  AlertCircle, 
+  Shield, 
+  Activity,
   GripHorizontal,
-  Info,
-  Volume2,
-  Film,
-  FileText,
-  Package,
-  Network,
-  Bot,
-  TestTube,
-  Map,
-  Palette,
-  AlertCircle,
-  Shield,
-  Activity
+  X,
+  Key
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { useDevLogsStore } from '@/stores/devLogsStore';
 
-// DevTools section definitions
-const SECTIONS = [
-  { id: 'overview', icon: Info, label: 'Overview', description: 'App info, version, environment' },
-  { id: 'audio', icon: Volume2, label: 'Audio', description: 'Mute toggles, volume, test routes' },
-  { id: 'video', icon: Film, label: 'Video/Animation', description: 'Rive status, FPS, debug mode' },
-  { id: 'content', icon: FileText, label: 'Text/Content', description: 'JSON inspector, validation' },
-  { id: 'libraries', icon: Package, label: 'Libraries', description: 'Dependencies with versions' },
-  { id: 'apis', icon: Network, label: 'APIs', description: 'Registry, connection tests' },
-  { id: 'agents', icon: Bot, label: 'MCP/Agents', description: 'Agent list, mock prompts' },
-  { id: 'data', icon: TestTube, label: 'Data & Test', description: 'Seed data, health checks' },
-  { id: 'flowchart', icon: Map, label: 'Flowchart', description: 'App route mapping' },
-  { id: 'tokens', icon: Palette, label: 'UI Tokens', description: 'Colors, typography, themes' },
-  { id: 'logs', icon: AlertCircle, label: 'Logs', description: 'Error console, warnings', hasNotification: true },
-  { id: 'security', icon: Shield, label: 'Security', description: 'Edge functions, RLS, secrets' },
-  { id: 'pipeline', icon: Activity, label: 'Pipeline', description: 'Generation history, lineage' },
-] as const;
+// Panel components - import these as you add them
+import { APIsPanel } from './panels/APIsPanel';
+import { AgentsPanel } from './panels/AgentsPanel';
+import { FlowchartPanel } from './panels/FlowchartPanel';
+import { LogsPanel } from './panels/LogsPanel';
+// Placeholder panels - replace with real ones as you build them
+// import { OverviewPanel } from './panels/OverviewPanel';
+// import { AudioPanel } from './panels/AudioPanel';
+// import { VideoPanel } from './panels/VideoPanel';
+// import { TextSyncPanel } from './panels/TextSyncPanel';
+// import { LibrariesPanel } from './panels/LibrariesPanel';
+// import { DataTestPanel } from './panels/DataTestPanel';
+// import { UITokensPanel } from './panels/UITokensPanel';
+// import { SecurityPanel } from './panels/SecurityPanel';
+// import { PipelinePanel } from './panels/PipelinePanel';
 
-type SectionId = typeof SECTIONS[number]['id'];
+interface DevToolsSection {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+  component?: React.ComponentType;
+  badge?: number | string;
+}
 
 interface MiniDevToolsPanelProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-// Panel height constraints
-const MIN_HEIGHT_PERCENT = 33;
-const DEFAULT_HEIGHT_PERCENT = 50;
-const MAX_HEIGHT_PERCENT = 75;
+export function MiniDevToolsPanel({ isOpen, onClose }: MiniDevToolsPanelProps) {
+  const [activeSection, setActiveSection] = useState('overview');
+  const [panelHeight, setPanelHeight] = useState(50); // percentage
+  const [isDragging, setIsDragging] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const dragStartY = useRef(0);
+  const dragStartHeight = useRef(0);
 
-export const MiniDevToolsPanel: React.FC<MiniDevToolsPanelProps> = ({
-  isOpen,
-  onClose,
-}) => {
-  const [activeSection, setActiveSection] = useState<SectionId>('overview');
-  const [panelHeight, setPanelHeight] = useState(DEFAULT_HEIGHT_PERCENT);
+  const { hasUnreadErrors, errorCount, warnCount } = useDevLogsStore();
 
-  // Drag handler for resizing (no framer-motion needed)
-  const handleDragStart = (e: React.MouseEvent) => {
+  // Define all sections
+  const sections: DevToolsSection[] = [
+    { id: 'overview', label: 'Overview', icon: Eye },
+    { id: 'audio', label: 'Audio', icon: Volume2 },
+    { id: 'video', label: 'Video/Animation', icon: Film },
+    { id: 'text', label: 'Text Sync', icon: FileText },
+    { id: 'libraries', label: 'Libraries', icon: Code },
+    { id: 'apis', label: 'API Keys', icon: Key, component: APIsPanel },
+    { id: 'agents', label: 'AI Agents', icon: Bot, component: AgentsPanel },
+    { id: 'data', label: 'Data & Test', icon: TestTube },
+    { id: 'flowchart', label: 'Route Map', icon: Map, component: FlowchartPanel },
+    { id: 'tokens', label: 'UI Tokens', icon: Palette },
+    { 
+      id: 'logs', 
+      label: 'Logs', 
+      icon: AlertCircle, 
+      component: LogsPanel,
+      badge: errorCount > 0 ? errorCount : warnCount > 0 ? warnCount : undefined 
+    },
+    { id: 'security', label: 'Security', icon: Shield },
+    { id: 'pipeline', label: 'Pipeline', icon: Activity },
+  ];
+
+  // Handle drag resize
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    setIsDragging(true);
+    dragStartY.current = e.clientY;
+    dragStartHeight.current = panelHeight;
     e.preventDefault();
-    const startY = e.clientY;
-    const startHeight = panelHeight;
+  }, [panelHeight]);
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const deltaY = startY - moveEvent.clientY;
-      const windowHeight = window.innerHeight;
-      const newHeightPercent = startHeight + (deltaY / windowHeight) * 100;
-      setPanelHeight(Math.max(MIN_HEIGHT_PERCENT, Math.min(MAX_HEIGHT_PERCENT, newHeightPercent)));
-    };
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging) return;
+    
+    const deltaY = dragStartY.current - e.clientY;
+    const deltaPercent = (deltaY / window.innerHeight) * 100;
+    const newHeight = Math.max(25, Math.min(85, dragStartHeight.current + deltaPercent));
+    setPanelHeight(newHeight);
+  }, [isDragging]);
 
-    const handleMouseUp = () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-  };
+  // Attach global mouse listeners for drag
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  // Get current section's component
+  const ActiveComponent = sections.find(s => s.id === activeSection)?.component;
+
+  // Render placeholder for sections without components yet
+  const renderPlaceholder = (sectionId: string) => (
+    <div className="flex flex-col items-center justify-center h-full text-center p-8">
+      <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+        {React.createElement(sections.find(s => s.id === sectionId)?.icon || Eye, { 
+          className: "h-8 w-8 text-muted-foreground" 
+        })}
+      </div>
+      <h3 className="text-lg font-medium text-foreground mb-2">
+        {sections.find(s => s.id === sectionId)?.label}
+      </h3>
+      <p className="text-sm text-muted-foreground max-w-xs">
+        This panel is coming soon. Check back after the next update!
+      </p>
+    </div>
+  );
 
   if (!isOpen) return null;
 
   return (
     <div
+      ref={panelRef}
       className={cn(
-        'fixed bottom-0 left-0 right-0 z-[9998]',
-        'bg-card/95 backdrop-blur-md border-t border-border shadow-2xl',
-        'flex flex-col',
-        'transition-transform duration-300 ease-out',
-        isOpen ? 'translate-y-0' : 'translate-y-full'
+        "fixed bottom-0 left-0 right-0 z-50",
+        "bg-card/95 backdrop-blur-xl border-t border-border",
+        "shadow-2xl shadow-black/20",
+        "transition-transform duration-300 ease-out",
+        isOpen ? "translate-y-0" : "translate-y-full"
       )}
-      style={{ height: `${panelHeight}%` }}
+      style={{ height: `${panelHeight}vh` }}
     >
-      {/* Resize Handle */}
+      {/* Drag Handle */}
       <div
-        onMouseDown={handleDragStart}
-        className="absolute -top-2 left-0 right-0 h-4 flex justify-center items-center cursor-row-resize z-10"
-        title="Drag to resize panel"
+        className={cn(
+          "absolute top-0 left-0 right-0 h-6 cursor-ns-resize",
+          "flex items-center justify-center",
+          "hover:bg-muted/50 transition-colors",
+          isDragging && "bg-muted/50"
+        )}
+        onMouseDown={handleMouseDown}
       >
-        <GripHorizontal className="w-8 h-8 text-muted-foreground/50 hover:text-primary transition-colors" />
+        <GripHorizontal className="h-4 w-4 text-muted-foreground" />
       </div>
 
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-green-500" />
-          <h3 className="text-sm font-semibold">Mini DevTools</h3>
-          <span className="text-xs text-muted-foreground">Mëku Storybook Studio</span>
-        </div>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={onClose}
-          className="h-7 w-7"
-        >
-          <X className="w-4 h-4" />
-        </Button>
-      </div>
+      {/* Close Button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="absolute top-1 right-2 h-6 w-6 p-0 z-10"
+        onClick={onClose}
+      >
+        <X className="h-4 w-4" />
+      </Button>
 
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* Main Layout */}
+      <div className="flex h-full pt-6">
         {/* Icon Rail */}
-        <div className="w-12 bg-card/30 border-r border-border flex flex-col items-center py-2 gap-1 overflow-y-auto">
-          {SECTIONS.map((section) => {
-            const Icon = section.icon;
-            const isActive = activeSection === section.id;
-            
-            return (
-              <Tooltip key={section.id}>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => setActiveSection(section.id)}
-                    className={cn(
-                      'relative w-9 h-9 flex items-center justify-center rounded-md transition-all',
-                      isActive 
-                        ? 'bg-primary/20 text-primary' 
-                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                    )}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {section.hasNotification && (
-                      <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
-                    )}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={8}>
-                  <p className="font-medium">{section.label}</p>
-                  <p className="text-xs text-muted-foreground">{section.description}</p>
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
+        <div className="w-12 flex-shrink-0 border-r border-border bg-muted/30">
+          <ScrollArea className="h-full">
+            <div className="flex flex-col items-center py-2 gap-1">
+              {sections.map((section) => {
+                const Icon = section.icon;
+                const isActive = activeSection === section.id;
+                
+                return (
+                  <Tooltip key={section.id} delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setActiveSection(section.id)}
+                        className={cn(
+                          "relative w-9 h-9 rounded-lg flex items-center justify-center",
+                          "transition-all duration-150",
+                          isActive 
+                            ? "bg-primary text-primary-foreground shadow-md" 
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        )}
+                      >
+                        <Icon className="h-4 w-4" />
+                        
+                        {/* Badge */}
+                        {section.badge && (
+                          <span className={cn(
+                            "absolute -top-1 -right-1 min-w-[16px] h-4 px-1",
+                            "rounded-full text-[10px] font-medium",
+                            "flex items-center justify-center",
+                            section.id === 'logs' && errorCount > 0
+                              ? "bg-red-500 text-white"
+                              : "bg-amber-500 text-white"
+                          )}>
+                            {section.badge}
+                          </span>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="text-xs">
+                      {section.label}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </ScrollArea>
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 p-4 overflow-auto">
-          <SectionContent sectionId={activeSection} />
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <ScrollArea className="h-full">
+            <div className="p-4">
+              {ActiveComponent ? (
+                <ActiveComponent />
+              ) : (
+                renderPlaceholder(activeSection)
+              )}
+            </div>
+          </ScrollArea>
         </div>
       </div>
     </div>
   );
-};
+}
 
-// Section content renderer
-const SectionContent: React.FC<{ sectionId: SectionId }> = ({ sectionId }) => {
-  const section = SECTIONS.find(s => s.id === sectionId);
-  
-  switch (sectionId) {
-    case 'overview':
-      return <OverviewSection />;
-    case 'tokens':
-      return <UITokensSection />;
-    case 'logs':
-      return <LogsSection />;
-    default:
-      return (
-        <div className="text-center py-12 text-muted-foreground">
-          {section && <section.icon className="w-12 h-12 mx-auto mb-4 opacity-30" />}
-          <p className="text-sm font-medium">{section?.label}</p>
-          <p className="text-xs mt-1">Coming soon...</p>
-        </div>
-      );
-  }
-};
-
-// Overview Section
-const OverviewSection: React.FC = () => (
-  <div className="space-y-4">
-    <h4 className="text-lg font-semibold">Overview</h4>
-    
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-      <InfoCard label="App Name" value="Mëku Storybook Studio" />
-      <InfoCard label="Version" value="2.1.0" />
-      <InfoCard label="Environment" value="development" />
-      <InfoCard label="Build" value="dev" />
-      <InfoCard label="AppVerse" value="Mëku Suite" />
-      <InfoCard label="Status" value="Active" valueColor="text-green-500" />
-    </div>
-
-    <div className="mt-6">
-      <h5 className="text-sm font-medium mb-2">Quick Links</h5>
-      <div className="flex flex-wrap gap-2">
-        <QuickLink href="https://replicate.com/account" label="Replicate Dashboard" />
-        <QuickLink href="https://supabase.com/dashboard" label="Supabase" />
-        <QuickLink href="#" label="Docs" disabled />
-      </div>
-    </div>
-  </div>
-);
-
-// UI Tokens Section
-const UITokensSection: React.FC = () => (
-  <div className="space-y-4">
-    <h4 className="text-lg font-semibold">UI Tokens</h4>
-    
-    <div>
-      <h5 className="text-sm font-medium mb-2">Canvas Colors</h5>
-      <div className="flex gap-2">
-        <ColorSwatch color="#f5f0e6" label="Parchment" />
-        <ColorSwatch color="#fffef9" label="Cream" />
-        <ColorSwatch color="#fffff5" label="Ivory" />
-        <ColorSwatch color="#f0e9d8" label="Aged" />
-      </div>
-    </div>
-
-    <div>
-      <h5 className="text-sm font-medium mb-2">Brand Colors</h5>
-      <div className="flex gap-2">
-        <ColorSwatch color="#8b5cf6" label="Purple" />
-        <ColorSwatch color="#06b6d4" label="Cyan" />
-        <ColorSwatch color="#7c3aed" label="Purple Dark" />
-      </div>
-    </div>
-  </div>
-);
-
-// Logs Section
-const LogsSection: React.FC = () => (
-  <div className="space-y-4">
-    <div className="flex items-center justify-between">
-      <h4 className="text-lg font-semibold">Logs</h4>
-      <Button variant="outline" size="sm">Clear</Button>
-    </div>
-    
-    <div className="bg-background/50 rounded-lg border border-border p-3 font-mono text-xs space-y-1 max-h-64 overflow-auto">
-      <LogLine level="info" message="App initialized" time="00:00:01" />
-      <LogLine level="info" message="Provider registry loaded" time="00:00:02" />
-      <LogLine level="warn" message="No API keys configured" time="00:00:02" />
-    </div>
-  </div>
-);
-
-// Helper Components
-const InfoCard: React.FC<{ label: string; value: string; valueColor?: string }> = ({ 
-  label, value, valueColor 
-}) => (
-  <div className="bg-background/50 rounded-lg border border-border p-3">
-    <p className="text-xs text-muted-foreground">{label}</p>
-    <p className={cn("text-sm font-medium mt-0.5", valueColor)}>{value}</p>
-  </div>
-);
-
-const QuickLink: React.FC<{ href: string; label: string; disabled?: boolean }> = ({ 
-  href, label, disabled 
-}) => (
-  <a
-    href={disabled ? undefined : href}
-    target="_blank"
-    rel="noopener noreferrer"
-    className={cn(
-      "text-xs px-2 py-1 rounded border",
-      disabled 
-        ? "border-border text-muted-foreground cursor-not-allowed opacity-50"
-        : "border-primary/30 text-primary hover:bg-primary/10 transition-colors"
-    )}
-  >
-    {label}
-  </a>
-);
-
-const ColorSwatch: React.FC<{ color: string; label: string }> = ({ color, label }) => (
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <div 
-        className="w-10 h-10 rounded-lg border border-border cursor-pointer hover:scale-105 transition-transform"
-        style={{ backgroundColor: color }}
-      />
-    </TooltipTrigger>
-    <TooltipContent>
-      <p>{label}</p>
-      <p className="text-xs text-muted-foreground font-mono">{color}</p>
-    </TooltipContent>
-  </Tooltip>
-);
-
-const LogLine: React.FC<{ level: 'info' | 'warn' | 'error'; message: string; time: string }> = ({
-  level, message, time
-}) => (
-  <div className="flex gap-2">
-    <span className="text-muted-foreground">[{time}]</span>
-    <span className={cn(
-      level === 'info' && 'text-blue-400',
-      level === 'warn' && 'text-yellow-400',
-      level === 'error' && 'text-red-400'
-    )}>
-      {level.toUpperCase()}
-    </span>
-    <span>{message}</span>
-  </div>
-);
+export default MiniDevToolsPanel;
