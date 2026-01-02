@@ -34,11 +34,105 @@ interface PageInfo {
   hidden: boolean;
 }
 
+// ==============================================================================
+// HISTORY HOOK - Fixes stale closure bug with undo/redo
+// ==============================================================================
+interface HistoryState<T> {
+  past: T[];
+  present: T;
+  future: T[];
+}
+
+function useHistory<T>(initialPresent: T) {
+  const [state, setState] = useState<HistoryState<T>>({
+    past: [],
+    present: initialPresent,
+    future: [],
+  });
+
+  const canUndo = state.past.length > 0;
+  const canRedo = state.future.length > 0;
+
+  const set = useCallback((newPresent: T | ((prev: T) => T)) => {
+    setState(currentState => {
+      const resolvedPresent = typeof newPresent === 'function' 
+        ? (newPresent as (prev: T) => T)(currentState.present)
+        : newPresent;
+      
+      return {
+        past: [...currentState.past, currentState.present],
+        present: resolvedPresent,
+        future: [],
+      };
+    });
+  }, []);
+
+  const undo = useCallback(() => {
+    setState(currentState => {
+      if (currentState.past.length === 0) return currentState;
+      
+      const previous = currentState.past[currentState.past.length - 1];
+      const newPast = currentState.past.slice(0, -1);
+      
+      return {
+        past: newPast,
+        present: previous,
+        future: [currentState.present, ...currentState.future],
+      };
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    setState(currentState => {
+      if (currentState.future.length === 0) return currentState;
+      
+      const next = currentState.future[0];
+      const newFuture = currentState.future.slice(1);
+      
+      return {
+        past: [...currentState.past, currentState.present],
+        present: next,
+        future: newFuture,
+      };
+    });
+  }, []);
+
+  const reset = useCallback((newPresent: T) => {
+    setState({
+      past: [],
+      present: newPresent,
+      future: [],
+    });
+  }, []);
+
+  return {
+    state: state.present,
+    set,
+    undo,
+    redo,
+    reset,
+    canUndo,
+    canRedo,
+    historyLength: state.past.length + 1 + state.future.length,
+    historyIndex: state.past.length,
+  };
+}
+
 const GraphicNovelBuilder = () => {
-  const [pages, setPages] = useState<SplitNode[]>([getDefaultPreset()]);
+  // Use the new history hook instead of manual history management
+  const {
+    state: pages,
+    set: setPages,
+    undo: undoHistory,
+    redo: redoHistory,
+    reset: resetHistory,
+    canUndo,
+    canRedo,
+    historyLength,
+    historyIndex,
+  } = useHistory<SplitNode[]>([getDefaultPreset()]);
+
   const [pageInfos, setPageInfos] = useState<PageInfo[]>([{ id: crypto.randomUUID(), name: 'Page 1', hidden: false }]);
-  const [history, setHistory] = useState<SplitNode[][]>([[getDefaultPreset()]]);
-  const [historyIndex, setHistoryIndex] = useState(0);
   
   const [characters, setCharacters] = useState<Character[]>([]);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
@@ -48,7 +142,7 @@ const GraphicNovelBuilder = () => {
 
   const [selectedPage, setSelectedPage] = useState(0);
   const [selectedId, setSelectedId] = useState("");
-  const [zoom, setZoom] = useState(0.62); // Default to fit portrait pages well
+  const [zoom, setZoom] = useState(0.62);
   const [outline, setOutline] = useState(false);
   const [globalSettings, setGlobalSettings] = useState({
     gutter: 8,
@@ -80,30 +174,56 @@ const GraphicNovelBuilder = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const pageRef = useRef<HTMLDivElement>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
 
-  // History management
-  const saveToHistory = useCallback((newPages: SplitNode[]) => {
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(JSON.parse(JSON.stringify(newPages)));
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  }, [history, historyIndex]);
-
+  // Undo/Redo with toast notifications
   const undo = useCallback(() => {
-    if (historyIndex > 0) {
-      setHistoryIndex(prev => prev - 1);
-      setPages(history[historyIndex - 1]);
+    if (canUndo) {
+      undoHistory();
       toast.success("Undone");
     }
-  }, [history, historyIndex]);
+  }, [canUndo, undoHistory]);
 
   const redo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      setHistoryIndex(prev => prev + 1);
-      setPages(history[historyIndex + 1]);
+    if (canRedo) {
+      redoHistory();
       toast.success("Redone");
     }
-  }, [history, historyIndex]);
+  }, [canRedo, redoHistory]);
+
+  // ==============================================================================
+  // FIT TO VIEWPORT - Calculates proper zoom to fit page in view
+  // ==============================================================================
+  const fitToViewport = useCallback(() => {
+    if (!canvasContainerRef.current) {
+      // Fallback if ref not available
+      setZoom(0.62);
+      return;
+    }
+
+    const container = canvasContainerRef.current;
+    const containerWidth = container.clientWidth - 80; // Subtract padding
+    const containerHeight = container.clientHeight - 80;
+
+    const { pageSize, orientation } = globalSettings;
+    const safePageSize = pageSize && PAGE_SIZES[pageSize] ? pageSize : 'A4';
+    const baseSize = PAGE_SIZES[safePageSize];
+    const pageWidth = orientation === 'landscape' ? baseSize.height : baseSize.width;
+    const pageHeight = orientation === 'landscape' ? baseSize.width : baseSize.height;
+
+    // Calculate zoom to fit both dimensions
+    const zoomToFitWidth = containerWidth / pageWidth;
+    const zoomToFitHeight = containerHeight / pageHeight;
+    
+    // Use the smaller zoom to ensure the whole page fits
+    const optimalZoom = Math.min(zoomToFitWidth, zoomToFitHeight, 1.5); // Cap at 150%
+    
+    // Round to 2 decimal places and ensure minimum of 0.1
+    const finalZoom = Math.max(0.1, Math.round(optimalZoom * 100) / 100);
+    
+    setZoom(finalZoom);
+    toast.success(`Zoom set to ${Math.round(finalZoom * 100)}%`);
+  }, [globalSettings]);
 
   // Load/Save
   useEffect(() => {
@@ -111,7 +231,9 @@ const GraphicNovelBuilder = () => {
     if (saved) {
       try {
         const data = JSON.parse(saved);
-        setPages(data.pages || [getDefaultPreset()]);
+        if (data.pages) {
+          resetHistory(data.pages);
+        }
         setPageInfos(data.pageInfos || [{ id: crypto.randomUUID(), name: 'Page 1', hidden: false }]);
         setGlobalSettings({ gutter: 8, background: '#ffffff', pageSize: 'A4', orientation: 'portrait', ...data.settings });
         setCharacters(data.characters || []);
@@ -127,7 +249,7 @@ const GraphicNovelBuilder = () => {
     if (recentList) {
       try { setRecentProjects(JSON.parse(recentList)); } catch (error) {}
     }
-  }, []);
+  }, [resetHistory]);
 
   const saveProject = useCallback(() => {
     const projectId = localStorage.getItem('gn-current-project-id') || crypto.randomUUID();
@@ -156,7 +278,9 @@ const GraphicNovelBuilder = () => {
     if (projectData) {
       try {
         const data = JSON.parse(projectData);
-        setPages(data.pages || [getDefaultPreset()]);
+        if (data.pages) {
+          resetHistory(data.pages);
+        }
         setPageInfos(data.pageInfos || [{ id: crypto.randomUUID(), name: 'Page 1', hidden: false }]);
         setGlobalSettings(data.settings || globalSettings);
         setCharacters(data.characters || []);
@@ -169,7 +293,7 @@ const GraphicNovelBuilder = () => {
         toast.error('Failed to load project');
       }
     }
-  }, [globalSettings]);
+  }, [globalSettings, resetHistory]);
 
   const handleDeleteRecentProject = useCallback((projectId: string) => {
     localStorage.removeItem(`gn-project-${projectId}`);
@@ -180,13 +304,10 @@ const GraphicNovelBuilder = () => {
     });
   }, []);
 
+  // Update page with history tracking
   const updatePage = useCallback((pageIndex: number, updater: (page: SplitNode) => SplitNode) => {
-    setPages(prev => {
-      const newPages = prev.map((page, i) => i === pageIndex ? updater(page) : page);
-      saveToHistory(newPages);
-      return newPages;
-    });
-  }, [saveToHistory]);
+    setPages(prev => prev.map((page, i) => i === pageIndex ? updater(page) : page));
+  }, [setPages]);
 
   const selectedNode = useMemo(() => {
     if (!selectedId || selectedPage >= pages.length) return null;
@@ -222,96 +343,114 @@ const GraphicNovelBuilder = () => {
   }, [selectedNode, parentNode, selectedPage, updatePage]);
 
   const handleDuplicatePanel = useCallback(() => {
-    if (!selectedNode) return;
+    if (!selectedNode || !parentNode) return;
     updatePage(selectedPage, prev => duplicateNodeInParent(prev, selectedNode.id) as SplitNode);
     toast.success('Panel duplicated');
-  }, [selectedNode, selectedPage, updatePage]);
+  }, [selectedNode, parentNode, selectedPage, updatePage]);
 
   const handleTextPropsChange = useCallback((updates: Record<string, any>) => {
     if (!selectedNode || selectedNode.kind !== 'leaf') return;
-    updatePage(selectedPage, prev => updateNode(prev, selectedNode.id, n => n.kind !== 'leaf' ? n : { ...n, textProps: { ...n.textProps, ...updates } }) as SplitNode);
+    updatePage(selectedPage, prev => updateNode(prev, selectedNode.id, n => {
+      if (n.kind !== 'leaf') return n;
+      return { ...n, textProps: { ...n.textProps, ...updates } };
+    }) as SplitNode);
   }, [selectedNode, selectedPage, updatePage]);
 
-  // Page management
-  const addPage = useCallback(() => {
-    setPages(prev => [...prev, getDefaultPreset()]);
-    setPageInfos(prev => [...prev, { id: crypto.randomUUID(), name: `Page ${prev.length + 1}`, hidden: false }]);
+  const handleUpdateLayerState = useCallback((id: string, updates: Partial<{ visible: boolean; locked: boolean; opacity: number }>) => {
+    setLayerStates(prev => ({ ...prev, [id]: { ...prev[id], id, visible: true, locked: false, opacity: 1, ...prev[id], ...updates } }));
   }, []);
+
+  // Page operations
+  const addPage = useCallback(() => {
+    const newPage = getDefaultPreset();
+    setPages(prev => [...prev, newPage]);
+    setPageInfos(prev => [...prev, { id: crypto.randomUUID(), name: `Page ${prev.length + 1}`, hidden: false }]);
+    setSelectedPage(pages.length);
+    setSelectedId('');
+    toast.success('Page added');
+  }, [pages.length, setPages]);
 
   const deletePage = useCallback((index: number) => {
-    if (pages.length <= 1) return;
+    if (pages.length <= 1) { toast.error('Cannot delete the only page'); return; }
     setPages(prev => prev.filter((_, i) => i !== index));
     setPageInfos(prev => prev.filter((_, i) => i !== index));
-    if (selectedPage >= pages.length - 1) setSelectedPage(Math.max(0, pages.length - 2));
-  }, [pages.length, selectedPage]);
+    if (selectedPage >= index && selectedPage > 0) setSelectedPage(selectedPage - 1);
+    setSelectedId('');
+    toast.success('Page deleted');
+  }, [pages.length, selectedPage, setPages]);
 
   const duplicatePage = useCallback((index: number) => {
-    setPages(prev => [...prev.slice(0, index + 1), JSON.parse(JSON.stringify(prev[index])), ...prev.slice(index + 1)]);
-    setPageInfos(prev => [...prev.slice(0, index + 1), { id: crypto.randomUUID(), name: `${prev[index].name} (Copy)`, hidden: prev[index].hidden }, ...prev.slice(index + 1)]);
-  }, []);
+    const pageToDuplicate = JSON.parse(JSON.stringify(pages[index]));
+    const assignNewIds = (node: Node): Node => {
+      const newId = crypto.randomUUID();
+      if (node.kind === 'leaf') return { ...node, id: newId };
+      return { ...node, id: newId, children: node.children.map(assignNewIds) };
+    };
+    const newPage = assignNewIds(pageToDuplicate) as SplitNode;
+    setPages(prev => [...prev.slice(0, index + 1), newPage, ...prev.slice(index + 1)]);
+    setPageInfos(prev => [...prev.slice(0, index + 1), { id: crypto.randomUUID(), name: `${prev[index].name} (copy)`, hidden: false }, ...prev.slice(index + 1)]);
+    setSelectedPage(index + 1);
+    toast.success('Page duplicated');
+  }, [pages, setPages]);
+
+  const applyPreset = useCallback((preset: SplitNode) => {
+    updatePage(selectedPage, () => preset);
+    setSelectedId('');
+    toast.success('Preset applied');
+  }, [selectedPage, updatePage]);
 
   const renamePage = useCallback((index: number, name: string) => {
     setPageInfos(prev => prev.map((info, i) => i === index ? { ...info, name } : info));
+  }, []);
+
+  const bulkRenamePage = useCallback((prefix: string) => {
+    setPageInfos(prev => prev.map((info, i) => ({ ...info, name: `${prefix} ${i + 1}` })));
+    toast.success('Pages renamed');
   }, []);
 
   const togglePageHidden = useCallback((index: number) => {
     setPageInfos(prev => prev.map((info, i) => i === index ? { ...info, hidden: !info.hidden } : info));
   }, []);
 
-  const bulkRenamePage = useCallback((startNumber: number) => {
-    setPageInfos(prev => prev.map((info, i) => ({ ...info, name: `Page ${startNumber + i}` })));
-    toast.success('Pages renamed');
-  }, []);
-
-  const applyPreset = useCallback((preset: SplitNode) => {
-    updatePage(selectedPage, () => JSON.parse(JSON.stringify(preset)));
-    setSelectedId("");
-  }, [selectedPage, updatePage]);
-
-  const addCharacter = useCallback((characterData: Omit<Character, 'id' | 'createdAt'>) => {
-    setCharacters(prev => [...prev, { ...characterData, id: crypto.randomUUID(), createdAt: new Date() }]);
-    toast.success(`Character created!`);
+  const addCharacter = useCallback((data: Omit<Character, 'id' | 'createdAt'>) => {
+    const newCharacter: Character = { ...data, id: crypto.randomUUID(), createdAt: new Date() };
+    setCharacters(prev => [...prev, newCharacter]);
+    toast.success(`Character "${data.name}" added`);
   }, []);
 
   const deleteCharacter = useCallback((id: string) => {
     setCharacters(prev => prev.filter(c => c.id !== id));
-    toast.success('Character deleted!');
+    toast.success('Character deleted');
   }, []);
 
   const handleSavePage = useCallback((pageInfo: { title: string; description: string; imageUrl: string; pageData: any; id?: string }) => {
-    setSavedPages(prev => [{ id: pageInfo.id || crypto.randomUUID(), title: pageInfo.title, description: pageInfo.description, imageUrl: pageInfo.imageUrl, pageData: pageInfo.pageData, createdAt: new Date() }, ...prev]);
+    if (pageInfo.id) {
+      setSavedPages(prev => prev.map(p => p.id === pageInfo.id ? { ...p, ...pageInfo, updatedAt: new Date() } : p));
+      toast.success('Page updated');
+    } else {
+      const newSavedPage: SavedPage = { ...pageInfo, id: crypto.randomUUID(), createdAt: new Date(), updatedAt: new Date() };
+      setSavedPages(prev => [...prev, newSavedPage]);
+      toast.success('Page saved');
+    }
   }, []);
 
-  const handleUpdateLayerState = useCallback((id: string, updates: Partial<{ visible: boolean; locked: boolean; opacity: number }>) => {
-    setLayerStates(prev => ({ ...prev, [id]: { id, visible: true, locked: false, opacity: 1, ...prev[id], ...updates } }));
-  }, []);
-
-  // Keyboard shortcuts
-  useKeyboardShortcuts({
-    onUndo: undo, onRedo: redo,
-    onZoomIn: () => setZoom(z => Math.min(2, z * 1.2)),
-    onZoomOut: () => setZoom(z => Math.max(0.1, z / 1.2)),
-    onZoomReset: () => setZoom(0.5),
-    onSplitHorizontal: () => selectedNode && handleSplitPanel('horizontal', 2),
-    onSplitVertical: () => selectedNode && handleSplitPanel('vertical', 2),
-    onDuplicate: handleDuplicatePanel, onDelete: handleDeletePanel,
-    onSave: saveProject, onNewPage: addPage, onDeselect: () => setSelectedId(''),
-    enabled: true
-  });
-
-  // Generation functions
   const createCompositeImage = async (images: string[]): Promise<string> => {
-    return new Promise((resolve) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d')!;
-      const gridSize = Math.ceil(Math.sqrt(images.length));
-      canvas.width = 512 * gridSize; canvas.height = 512 * gridSize;
-      let loadedCount = 0;
-      images.forEach((src, index) => {
-        const img = document.createElement('img');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d')!;
+    const size = Math.ceil(Math.sqrt(images.length));
+    const cellSize = 512;
+    canvas.width = canvas.height = size * cellSize;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    let loadedCount = 0;
+    return new Promise(resolve => {
+      images.forEach((src, i) => {
+        const img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => {
-          ctx.drawImage(img, (index % gridSize) * 512, Math.floor(index / gridSize) * 512, 512, 512);
+          const x = (i % size) * cellSize;
+          const y = Math.floor(i / size) * cellSize;
+          ctx.drawImage(img, x, y, cellSize, cellSize);
           if (++loadedCount === images.length) resolve(canvas.toDataURL('image/png'));
         };
         img.src = src;
@@ -368,7 +507,7 @@ const GraphicNovelBuilder = () => {
     }
   };
 
-  // Computed values - single page view (no spread)
+  // Computed values
   const currentPage = pages[selectedPage];
   const { gutter, pageSize, orientation } = globalSettings;
   const safePageSize = pageSize && PAGE_SIZES[pageSize] ? pageSize : 'A4';
@@ -385,21 +524,21 @@ const GraphicNovelBuilder = () => {
               <ResizablePanel defaultSize={25} minSize={20} maxSize={50}>
                 <BuilderSidebar
                   pages={pages} selectedPage={selectedPage} zoom={zoom} outline={outline}
-                  historyIndex={historyIndex} historyLength={history.length}
+                  historyIndex={historyIndex} historyLength={historyLength}
                   globalSettings={globalSettings} gridSettings={gridSettings}
                   characters={characters} generatedImages={generatedImages} savedPages={savedPages}
                   recentProjects={recentProjects} lastSaved={lastSaved}
                   selectedNode={selectedNode} parentNode={parentNode} selectedId={selectedId} layerStates={layerStates}
                   pageRef={pageRef}
                   onAddPage={addPage} onDeletePage={deletePage} onDuplicatePage={duplicatePage}
-                  onUndo={undo} onRedo={redo} onFitToViewport={() => setZoom(0.5)}
+                  onUndo={undo} onRedo={redo} onFitToViewport={fitToViewport}
                   onZoomIn={() => setZoom(z => Math.min(2, z * 1.2))} onZoomOut={() => setZoom(z => Math.max(0.1, z / 1.2))}
                   onOutlineChange={setOutline} onSettingsChange={setGlobalSettings} onGridSettingsChange={setGridSettings}
                   onApplyPreset={applyPreset} onAddCharacter={addCharacter} onDeleteCharacter={deleteCharacter}
                   onSavePage={handleSavePage} onSelectNode={setSelectedId}
                   onUpdateLayerState={handleUpdateLayerState} onReorderLayers={() => {}}
                   onLoadRecentProject={handleLoadRecentProject} onDeleteRecentProject={handleDeleteRecentProject}
-                  onLoadCloudProject={(data) => { if (data.pages) setPages(data.pages); if (data.characters) setCharacters(data.characters); if (data.generatedImages) setGeneratedImages(data.generatedImages); }}
+                  onLoadCloudProject={(data) => { if (data.pages) resetHistory(data.pages); if (data.characters) setCharacters(data.characters); if (data.generatedImages) setGeneratedImages(data.generatedImages); }}
                   onSplitPanel={handleSplitPanel} onMergePanel={handleMergePanel}
                   onDeletePanel={handleDeletePanel} onDuplicatePanel={handleDuplicatePanel}
                   onTextPropsChange={handleTextPropsChange}
@@ -407,16 +546,18 @@ const GraphicNovelBuilder = () => {
               </ResizablePanel>
               <ResizableHandle withHandle />
               <ResizablePanel defaultSize={50}>
-                <CanvasArea
-                  ref={pageRef}
-                  currentPage={currentPage}
-                  selectedPage={selectedPage} selectedId={selectedId}
-                  zoom={zoom} gutter={gutter} outline={outline}
-                  pageWidth={pageWidth} pageHeight={pageHeight} pageBg={globalSettings.background}
-                  pageRadius={8} gridSettings={gridSettings}
-                  onZoomChange={setZoom} onSelectPage={setSelectedPage} onSelectId={setSelectedId}
-                  onResize={(pageIdx, id, index, delta) => updatePage(pageIdx, prev => updateNode(prev, id, n => applyResize(n, index, delta)) as SplitNode)}
-                />
+                <div ref={canvasContainerRef} className="h-full w-full">
+                  <CanvasArea
+                    ref={pageRef}
+                    currentPage={currentPage}
+                    selectedPage={selectedPage} selectedId={selectedId}
+                    zoom={zoom} gutter={gutter} outline={outline}
+                    pageWidth={pageWidth} pageHeight={pageHeight} pageBg={globalSettings.background}
+                    pageRadius={8} gridSettings={gridSettings}
+                    onZoomChange={setZoom} onSelectPage={setSelectedPage} onSelectId={setSelectedId}
+                    onResize={(pageIdx, id, index, delta) => updatePage(pageIdx, prev => updateNode(prev, id, n => applyResize(n, index, delta)) as SplitNode)}
+                  />
+                </div>
               </ResizablePanel>
               <ResizableHandle withHandle />
               <ResizablePanel defaultSize={25} minSize={20} maxSize={50}>

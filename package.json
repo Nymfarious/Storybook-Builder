@@ -1,11 +1,12 @@
 {
   "name": "meku-storybook-builder",
   "private": true,
-  "version": "2.1.1",
+  "version": "2.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:ghpages": "vite build --mode ghpages",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"
