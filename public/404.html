@@ -2,13 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>MeKu Storybook Builder</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meku Storybook Builder</title>
     <script>
       // Single Page Apps for GitHub Pages
       // https://github.com/rafgraph/spa-github-pages
-      // This script takes the current URL and converts the path and query
-      // string into just a query string, and then redirects to the index.html
-      // with the new query string.
+      // Redirects 404s to index.html with the path encoded in query string
       var pathSegmentsToKeep = 1; // Keep /MeKu-Storybook-Builder/ as base
 
       var l = window.location;
@@ -22,5 +21,10 @@
     </script>
   </head>
   <body>
+    <noscript>
+      <h1>Meku Storybook Builder</h1>
+      <p>JavaScript is required to run this application.</p>
+      <p><a href="./">Go to home page</a></p>
+    </noscript>
   </body>
 </html>

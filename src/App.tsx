@@ -23,26 +23,59 @@ import About from '@/pages/About';
 
 const queryClient = new QueryClient();
 
+// Dynamic basename: Use env variable or detect from URL
+// For GitHub Pages: /MeKu-Storybook-Builder
+// For Lovable/local: /
+const getBasename = () => {
+  // Check if we're on GitHub Pages
+  if (typeof window !== 'undefined' && window.location.hostname.includes('github.io')) {
+    return '/MeKu-Storybook-Builder';
+  }
+  // Check for Vite env variable (set during build)
+  if (import.meta.env.BASE_URL && import.meta.env.BASE_URL !== '/') {
+    return import.meta.env.BASE_URL.replace(/\/$/, ''); // Remove trailing slash
+  }
+  return '';
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter basename="/MeKu-Storybook-Builder">
+        <BrowserRouter basename={getBasename()}>
           <Routes>
+            {/* Public routes - no auth required */}
             <Route path="/auth" element={<Auth />} />
+            <Route path="/about" element={<About />} />
+            
+            {/* Home - accessible to everyone */}
             <Route path="/" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Index />
-                </Layout>
-              </ProtectedRoute>
+              <Layout>
+                <Index />
+              </Layout>
             } />
+            
+            {/* Story Demo - public for showcasing */}
+            <Route path="/story-demo" element={
+              <Layout>
+                <StoryDemo />
+              </Layout>
+            } />
+            
+            {/* Protected routes - require auth or dev bypass */}
             <Route path="/graphic-novel-builder" element={
               <ProtectedRoute>
                 <Layout>
                   <GraphicNovelBuilder />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/builder" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Builder />
                 </Layout>
               </ProtectedRoute>
             } />
@@ -81,18 +114,9 @@ const App = () => (
                 </Layout>
               </ProtectedRoute>
             } />
-            <Route path="/story-demo" element={
-              <ProtectedRoute>
-                <StoryDemo />
-              </ProtectedRoute>
-            } />
-            <Route path="/builder" element={
-              <ProtectedRoute>
-                <Builder />
-              </ProtectedRoute>
-            } />
+            
+            {/* 404 */}
             <Route path="*" element={<NotFound />} />
-			<Route path="/about" element={<About />} />
           </Routes>
         </BrowserRouter>
         <MiniDevTools />

@@ -2,7 +2,7 @@
 
 A creative platform for building visual stories, comics, and illustrated narratives. Part of the AppVerse ecosystem.
 
-![Meku Storybook Builder Interface](./docs/images/builder-screenshot.png)
+![Meku Storybook Builder Interface](./docs/builder-screenshot.png)
 
 ## ✨ Features
 
@@ -63,23 +63,12 @@ npm install
 # Start development server
 npm run dev
 
-# Build for production (Lovable)
+# Build for GitHub Pages (default)
 npm run build
 
-# Build for GitHub Pages
-npm run build:ghpages
+# Build for Lovable platform
+npm run build:lovable
 ```
-
-### Deployment
-
-This app supports **dual deployment**:
-
-| Command | Base Path | Use For |
-|---------|-----------|---------|
-| `npm run build` | `/` | Lovable platform |
-| `npm run build:ghpages` | `/MeKu-Storybook-Builder/` | GitHub Pages |
-
-See [DUAL_DEPLOYMENT.md](./docs/DUAL_DEPLOYMENT.md) for detailed setup instructions.
 
 ---
 
@@ -131,15 +120,9 @@ src/
 
 ---
 
-## 🤝 Contributing
-
-This is a personal project developed with AI assistance (Claude, GPT, Gemini) via the Lovable platform.
-
----
-
 ## 📄 License
 
-MIT License - See [LICENSE](./LICENSE) for details.
+MIT License
 
 ---
 

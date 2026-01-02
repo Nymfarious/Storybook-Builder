@@ -5,10 +5,10 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  // Determine base path based on build mode
-  // - 'ghpages' mode: Use repo name for GitHub Pages deployment
-  // - 'production' or 'development': Use root path for Lovable/local
-  const base = mode === 'ghpages' 
+  // Dynamic base path:
+  // - For GitHub Pages (ghpages mode or production): /MeKu-Storybook-Builder/
+  // - For Lovable/local development: /
+  const base = mode === 'ghpages' || (mode === 'production' && process.env.GITHUB_PAGES === 'true')
     ? '/MeKu-Storybook-Builder/' 
     : '/';
 

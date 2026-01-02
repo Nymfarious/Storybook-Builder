@@ -196,13 +196,12 @@ const GraphicNovelBuilder = () => {
   // ==============================================================================
   const fitToViewport = useCallback(() => {
     if (!canvasContainerRef.current) {
-      // Fallback if ref not available
       setZoom(0.62);
       return;
     }
 
     const container = canvasContainerRef.current;
-    const containerWidth = container.clientWidth - 80; // Subtract padding
+    const containerWidth = container.clientWidth - 80;
     const containerHeight = container.clientHeight - 80;
 
     const { pageSize, orientation } = globalSettings;
@@ -211,18 +210,13 @@ const GraphicNovelBuilder = () => {
     const pageWidth = orientation === 'landscape' ? baseSize.height : baseSize.width;
     const pageHeight = orientation === 'landscape' ? baseSize.width : baseSize.height;
 
-    // Calculate zoom to fit both dimensions
     const zoomToFitWidth = containerWidth / pageWidth;
     const zoomToFitHeight = containerHeight / pageHeight;
-    
-    // Use the smaller zoom to ensure the whole page fits
-    const optimalZoom = Math.min(zoomToFitWidth, zoomToFitHeight, 1.5); // Cap at 150%
-    
-    // Round to 2 decimal places and ensure minimum of 0.1
+    const optimalZoom = Math.min(zoomToFitWidth, zoomToFitHeight, 1.5);
     const finalZoom = Math.max(0.1, Math.round(optimalZoom * 100) / 100);
     
     setZoom(finalZoom);
-    toast.success(`Zoom set to ${Math.round(finalZoom * 100)}%`);
+    toast.success(`Zoom: ${Math.round(finalZoom * 100)}%`);
   }, [globalSettings]);
 
   // Load/Save
@@ -231,9 +225,7 @@ const GraphicNovelBuilder = () => {
     if (saved) {
       try {
         const data = JSON.parse(saved);
-        if (data.pages) {
-          resetHistory(data.pages);
-        }
+        if (data.pages) resetHistory(data.pages);
         setPageInfos(data.pageInfos || [{ id: crypto.randomUUID(), name: 'Page 1', hidden: false }]);
         setGlobalSettings({ gutter: 8, background: '#ffffff', pageSize: 'A4', orientation: 'portrait', ...data.settings });
         setCharacters(data.characters || []);
@@ -278,9 +270,7 @@ const GraphicNovelBuilder = () => {
     if (projectData) {
       try {
         const data = JSON.parse(projectData);
-        if (data.pages) {
-          resetHistory(data.pages);
-        }
+        if (data.pages) resetHistory(data.pages);
         setPageInfos(data.pageInfos || [{ id: crypto.randomUUID(), name: 'Page 1', hidden: false }]);
         setGlobalSettings(data.settings || globalSettings);
         setCharacters(data.characters || []);
@@ -304,7 +294,6 @@ const GraphicNovelBuilder = () => {
     });
   }, []);
 
-  // Update page with history tracking
   const updatePage = useCallback((pageIndex: number, updater: (page: SplitNode) => SplitNode) => {
     setPages(prev => prev.map((page, i) => i === pageIndex ? updater(page) : page));
   }, [setPages]);
@@ -319,7 +308,6 @@ const GraphicNovelBuilder = () => {
     return findParentNode(pages[selectedPage], selectedId);
   }, [pages, selectedPage, selectedId]);
 
-  // Panel operations
   const handleSplitPanel = useCallback((direction: 'horizontal' | 'vertical', count: number) => {
     if (!selectedNode) return;
     const newNode = selectedNode.kind === 'leaf' ? splitLeafNode(selectedNode, direction, count) : splitSplitNode(selectedNode, direction, count);
@@ -360,7 +348,6 @@ const GraphicNovelBuilder = () => {
     setLayerStates(prev => ({ ...prev, [id]: { ...prev[id], id, visible: true, locked: false, opacity: 1, ...prev[id], ...updates } }));
   }, []);
 
-  // Page operations
   const addPage = useCallback(() => {
     const newPage = getDefaultPreset();
     setPages(prev => [...prev, newPage]);
@@ -507,7 +494,6 @@ const GraphicNovelBuilder = () => {
     }
   };
 
-  // Computed values
   const currentPage = pages[selectedPage];
   const { gutter, pageSize, orientation } = globalSettings;
   const safePageSize = pageSize && PAGE_SIZES[pageSize] ? pageSize : 'A4';

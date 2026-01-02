@@ -4,10 +4,10 @@
 export const APP_VERSION = '2.3.0';
 export const APP_NAME = 'MeKu Storybook Builder';
 export const APP_CODENAME = 'Wordsmith';
-export const BUILD_DATE = '2026-01-01';
+export const BUILD_DATE = '2026-01-02';
 
 export const VERSION_HISTORY = [
-  { version: '2.3.0', date: '2026-01-01', name: 'Wordsmith', notes: 'Page Builder, panel layouts, image library, text import, Writing Studio (AI tools)' },
+  { version: '2.3.0', date: '2026-01-02', name: 'Wordsmith', notes: 'Fixed undo/redo, fit-to-viewport, dynamic routing for GitHub Pages, blocked social media bots' },
   { version: '2.2.0', date: '2026-01-01', name: 'Storyteller', notes: 'Story player, timeline animations, tap reactions, particle effects' },
   { version: '2.1.1', date: '2026-01-01', name: 'Foundation', notes: 'Repo rename to MeKu-Storybook-Builder, base path fix' },
   { version: '2.1.0', date: '2025-01-01', name: 'Foundation', notes: 'Mini DevTools, API management, responsive panels' },
